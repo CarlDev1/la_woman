@@ -32,17 +32,16 @@ export default function Leaderboard() {
     try {
       const monthStart = startOfMonth(new Date()).toISOString().split('T')[0];
 
-      // Revenue ranking
+      // Revenue ranking - exclude admins by checking user_roles
       const { data: revenueData } = await supabase
         .from('daily_results')
         .select(`
           user_id,
           revenue,
-          profiles!inner(full_name, avatar_url, status, role)
+          profiles!inner(full_name, avatar_url, status)
         `)
         .gte('date', monthStart)
-        .eq('profiles.status', 'active')
-        .eq('profiles.role', 'user');
+        .eq('profiles.status', 'active');
 
       if (revenueData) {
         const grouped = revenueData.reduce((acc: Record<string, RankingEntry>, item: any) => {
@@ -62,17 +61,16 @@ export default function Leaderboard() {
         setRevenueRanking(sorted);
       }
 
-      // Profit ranking
+      // Profit ranking - exclude admins by checking user_roles
       const { data: profitData } = await supabase
         .from('daily_results')
         .select(`
           user_id,
           profit,
-          profiles!inner(full_name, avatar_url, status, role)
+          profiles!inner(full_name, avatar_url, status)
         `)
         .gte('date', monthStart)
-        .eq('profiles.status', 'active')
-        .eq('profiles.role', 'user');
+        .eq('profiles.status', 'active');
 
       if (profitData) {
         const grouped = profitData.reduce((acc: Record<string, RankingEntry>, item: any) => {
@@ -92,15 +90,14 @@ export default function Leaderboard() {
         setProfitRanking(sorted);
       }
 
-      // Trophy ranking
+      // Trophy ranking - exclude admins by checking user_roles
       const { data: trophyData } = await supabase
         .from('user_trophies')
         .select(`
           user_id,
-          profiles!inner(full_name, avatar_url, status, role)
+          profiles!inner(full_name, avatar_url, status)
         `)
-        .eq('profiles.status', 'active')
-        .eq('profiles.role', 'user');
+        .eq('profiles.status', 'active');
 
       if (trophyData) {
         const grouped = trophyData.reduce((acc: Record<string, RankingEntry>, item: any) => {

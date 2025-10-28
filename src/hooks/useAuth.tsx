@@ -144,9 +144,8 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
     return null;
   }
 
-  if (adminOnly && profile.role !== 'admin') {
-    return null;
-  }
+  // Admin check is now handled by the component using useUserRole hook
+  // This ProtectedRoute only checks authentication and active status
 
   return <>{children}</>;
 }

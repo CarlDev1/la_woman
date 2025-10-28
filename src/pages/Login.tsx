@@ -51,13 +51,10 @@ const Login = () => {
           return;
         }
 
-        // Active account - redirect based on role
+        // Active account - redirect to dashboard
+        // Role-based routing will be handled by the app based on user_roles table
         toast.success('Connexion réussie !');
-        if (profile.role === 'admin') {
-          navigate('/admin/dashboard');
-        } else {
-          navigate('/dashboard');
-        }
+        navigate('/dashboard');
       }
     } catch (error: any) {
       toast.error(error.message || 'Email ou mot de passe incorrect');
