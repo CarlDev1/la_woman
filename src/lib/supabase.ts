@@ -5,6 +5,8 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIU
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+export type AppRole = 'admin' | 'user';
+
 export type Profile = {
   id: string;
   full_name: string;
@@ -13,10 +15,17 @@ export type Profile = {
   avatar_url: string | null;
   payment_proof_url: string | null;
   contract_url: string | null;
-  role: 'user' | 'admin';
+  role: 'user' | 'admin'; // Deprecated: kept for backwards compatibility
   status: 'pending' | 'active' | 'inactive';
   created_at: string;
   updated_at: string;
+};
+
+export type UserRole = {
+  id: string;
+  user_id: string;
+  role: AppRole;
+  created_at: string;
 };
 
 export type DailyResult = {
