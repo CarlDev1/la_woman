@@ -1,8 +1,10 @@
 import { ReactNode } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserRole } from '@/hooks/useUserRole';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   LayoutDashboard,
   Trophy,
@@ -11,6 +13,7 @@ import {
   Award,
   User,
   LogOut,
+  Shield,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -34,6 +37,7 @@ const mobileNavItems = [
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   const { profile, signOut } = useAuth();
+  const { isAdmin } = useUserRole();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -57,7 +61,16 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-3">
             <div className="hidden text-right sm:block">
               <p className="text-sm font-medium">{profile?.full_name}</p>
-              <p className="text-xs text-muted-foreground">Participante</p>
+              <div className="flex items-center gap-2">
+                <p className="text-xs text-muted-foreground">
+                  {isAdmin ? 'Administratrice' : 'Participante'}
+                </p>
+                {isAdmin && (
+                  <Badge variant="default" className="h-5 text-xs">
+                    Admin
+                  </Badge>
+                )}
+              </div>
             </div>
             <Avatar className="h-10 w-10 border-2 border-primary/20">
               <AvatarImage src={profile?.avatar_url || ''} alt={profile?.full_name} />
@@ -100,6 +113,24 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 </Link>
               );
             })}
+            
+            {isAdmin && (
+              <>
+                <div className="my-2 border-t border-border" />
+                <Link
+                  to="/admin"
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive('/admin')
+                      ? 'border-l-4 border-primary bg-primary/5 text-primary'
+                      : 'text-muted-foreground hover:bg-primary/5 hover:text-foreground'
+                  )}
+                >
+                  <Shield className="h-5 w-5" />
+                  Administration
+                </Link>
+              </>
+            )}
           </nav>
         </aside>
 
