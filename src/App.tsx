@@ -14,6 +14,8 @@ import History from "./pages/History";
 import Leaderboard from "./pages/Leaderboard";
 import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
+import AdminParticipants from "./pages/AdminParticipants";
+import AdminTrophies from "./pages/AdminTrophies";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -40,6 +42,8 @@ const App = () => (
             
             {/* Admin Routes */}
             <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/admin/participants" element={<ProtectedRoute><AdminParticipants /></ProtectedRoute>} />
+            <Route path="/admin/trophies" element={<ProtectedRoute><AdminTrophies /></ProtectedRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

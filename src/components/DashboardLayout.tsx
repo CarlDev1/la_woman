@@ -14,6 +14,7 @@ import {
   User,
   LogOut,
   Shield,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -128,6 +129,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 >
                   <Shield className="h-5 w-5" />
                   Administration
+                </Link>
+                <Link
+                  to="/admin/participants"
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive('/admin/participants')
+                      ? 'border-l-4 border-primary bg-primary/5 text-primary'
+                      : 'text-muted-foreground hover:bg-primary/5 hover:text-foreground'
+                  )}
+                >
+                  <Users className="h-5 w-5" />
+                  Participantes
+                </Link>
+                <Link
+                  to="/admin/trophies"
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive('/admin/trophies')
+                      ? 'border-l-4 border-primary bg-primary/5 text-primary'
+                      : 'text-muted-foreground hover:bg-primary/5 hover:text-foreground'
+                  )}
+                >
+                  <Trophy className="h-5 w-5" />
+                  Trophées
                 </Link>
               </>
             )}
