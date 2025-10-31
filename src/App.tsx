@@ -16,6 +16,7 @@ import Profile from "./pages/Profile";
 import Admin from "./pages/Admin";
 import AdminParticipants from "./pages/AdminParticipants";
 import AdminTrophies from "./pages/AdminTrophies";
+import PendingApproval from "./pages/PendingApproval";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/pending-approval" element={<PendingApproval />} />
             
             {/* User Routes - Accessible sans connexion */}
             <Route path="/dashboard" element={<Dashboard />} />
