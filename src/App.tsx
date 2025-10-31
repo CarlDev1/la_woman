@@ -32,18 +32,18 @@ const App = () => (
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             
-            {/* Protected User Routes */}
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/trophies" element={<ProtectedRoute><Trophies /></ProtectedRoute>} />
-            <Route path="/new-entry" element={<ProtectedRoute><NewEntry /></ProtectedRoute>} />
-            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
-            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
-            <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+            {/* User Routes - Accessible sans connexion */}
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/trophies" element={<Trophies />} />
+            <Route path="/new-entry" element={<NewEntry />} />
+            <Route path="/history" element={<History />} />
+            <Route path="/leaderboard" element={<Leaderboard />} />
+            <Route path="/profile" element={<Profile />} />
             
-            {/* Admin Routes */}
-            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
-            <Route path="/admin/participants" element={<ProtectedRoute><AdminParticipants /></ProtectedRoute>} />
-            <Route path="/admin/trophies" element={<ProtectedRoute><AdminTrophies /></ProtectedRoute>} />
+            {/* Admin Routes - Accessible sans connexion */}
+            <Route path="/admin" element={<Admin />} />
+            <Route path="/admin/participants" element={<AdminParticipants />} />
+            <Route path="/admin/trophies" element={<AdminTrophies />} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
