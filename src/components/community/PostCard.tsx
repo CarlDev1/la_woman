@@ -22,37 +22,33 @@ import {
 } from "@/components/ui/alert-dialog";
 import CommentSection from "./CommentSection";
 import ImageModal from "./ImageModal";
+import EditPostModal from "./EditPostModal";
 import { toast } from "sonner";
-
-interface PostAuthor {
-  id: string;
-  name: string;
-  avatar: string;
-  isAdmin: boolean;
-}
-
-interface Post {
-  id: string;
-  author: PostAuthor;
-  content: string;
-  imageUrl: string | null;
-  createdAt: Date;
-  likesCount: number;
-  commentsCount: number;
-  isLiked: boolean;
-}
+import { Post } from "@/hooks/usePosts";
 
 interface PostCardProps {
   post: Post;
   currentUserId: string;
   onToggleLike: (postId: string) => void;
+  onUpdate: (postId: string, content: string, imageFile?: File) => void;
   onDelete: (postId: string) => void;
+  onCommentAdded: (postId: string) => void;
+  onCommentDeleted: (postId: string) => void;
 }
 
-const PostCard = ({ post, currentUserId, onToggleLike, onDelete }: PostCardProps) => {
+const PostCard = ({ 
+  post, 
+  currentUserId, 
+  onToggleLike, 
+  onUpdate,
+  onDelete,
+  onCommentAdded,
+  onCommentDeleted
+}: PostCardProps) => {
   const [showComments, setShowComments] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
   
   const isOwnPost = post.author.id === currentUserId;
@@ -122,11 +118,11 @@ const PostCard = ({ post, currentUserId, onToggleLike, onDelete }: PostCardProps
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setShowEditModal(true)}>
                     <Edit className="w-4 h-4 mr-2" />
                     Modifier
                   </DropdownMenuItem>
-                  <DropdownMenuItem 
+                  <DropdownMenuItem
                     className="text-destructive"
                     onClick={() => setShowDeleteDialog(true)}
                   >
@@ -204,6 +200,8 @@ const PostCard = ({ post, currentUserId, onToggleLike, onDelete }: PostCardProps
             <CommentSection 
               postId={post.id}
               currentUserId={currentUserId}
+              onCommentAdded={() => onCommentAdded(post.id)}
+              onCommentDeleted={() => onCommentDeleted(post.id)}
             />
           )}
         </CardFooter>
@@ -225,6 +223,14 @@ const PostCard = ({ post, currentUserId, onToggleLike, onDelete }: PostCardProps
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <EditPostModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        onSubmit={(content, imageFile) => onUpdate(post.id, content, imageFile)}
+        initialContent={post.content}
+        initialImageUrl={post.imageUrl}
+      />
 
       {post.imageUrl && (
         <ImageModal

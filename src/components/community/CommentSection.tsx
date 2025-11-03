@@ -6,54 +6,27 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { toast } from "sonner";
-
-interface Comment {
-  id: string;
-  author: {
-    id: string;
-    name: string;
-    avatar: string;
-    isAdmin: boolean;
-  };
-  content: string;
-  createdAt: Date;
-}
+import { useComments } from "@/hooks/useComments";
 
 interface CommentSectionProps {
   postId: string;
   currentUserId: string;
+  onCommentAdded: () => void;
+  onCommentDeleted: () => void;
 }
 
-// Mock comments
-const mockComments: Comment[] = [
-  {
-    id: "1",
-    author: {
-      id: "user3",
-      name: "Clara Bernard",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Clara",
-      isAdmin: false
-    },
-    content: "Super motivation ! Continue comme ça 💪",
-    createdAt: new Date(Date.now() - 30 * 60 * 1000)
-  },
-  {
-    id: "2",
-    author: {
-      id: "admin1",
-      name: "Julie Coach",
-      avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Julie",
-      isAdmin: true
-    },
-    content: "Bravo pour cette première semaine ! Vous êtes sur la bonne voie 🎉",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000)
-  }
-];
-
-const CommentSection = ({ postId, currentUserId }: CommentSectionProps) => {
-  const [comments, setComments] = useState<Comment[]>(mockComments);
+const CommentSection = ({ 
+  postId, 
+  currentUserId,
+  onCommentAdded,
+  onCommentDeleted 
+}: CommentSectionProps) => {
+  const { comments, currentUser, addComment, deleteComment, canDeleteComment } = useComments(postId);
   const [newComment, setNewComment] = useState("");
   const [showAll, setShowAll] = useState(false);
+  
+  // TODO: Récupérer le statut admin du user connecté
+  const isAdmin = false;
   
   const displayedComments = showAll ? comments : comments.slice(0, 5);
   const hasMore = comments.length > 5;
@@ -71,7 +44,7 @@ const CommentSection = ({ postId, currentUserId }: CommentSectionProps) => {
     return "Il y a plus d'un jour";
   };
 
-  const handleSubmitComment = () => {
+  const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
     
     if (newComment.length > 300) {
@@ -79,31 +52,24 @@ const CommentSection = ({ postId, currentUserId }: CommentSectionProps) => {
       return;
     }
 
-    // TODO: Ajouter le commentaire à la DB
-    const comment: Comment = {
-      id: Date.now().toString(),
-      author: {
-        id: currentUserId,
-        name: "Vous", // TODO: Récupérer le vrai nom
-        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=You",
-        isAdmin: false
-      },
-      content: newComment,
-      createdAt: new Date()
-    };
-    
-    setComments([...comments, comment]);
-    setNewComment("");
-    toast.success("Commentaire publié");
+    try {
+      await addComment(newComment);
+      setNewComment("");
+      onCommentAdded();
+      toast.success("Commentaire publié");
+    } catch (error) {
+      toast.error("Erreur lors de la publication du commentaire");
+    }
   };
 
-  const handleDeleteComment = (commentId: string) => {
-    setComments(comments.filter(c => c.id !== commentId));
-    toast.success("Commentaire supprimé");
-  };
-
-  const canDeleteComment = (comment: Comment) => {
-    return comment.author.id === currentUserId; // TODO: || isAdmin
+  const handleDeleteComment = async (commentId: string) => {
+    try {
+      await deleteComment(commentId);
+      onCommentDeleted();
+      toast.success("Commentaire supprimé");
+    } catch (error) {
+      toast.error("Erreur lors de la suppression du commentaire");
+    }
   };
 
   return (
@@ -113,8 +79,8 @@ const CommentSection = ({ postId, currentUserId }: CommentSectionProps) => {
       {/* Input nouveau commentaire */}
       <div className="flex gap-3">
         <Avatar className="w-8 h-8">
-          <AvatarImage src="https://api.dicebear.com/7.x/avataaars/svg?seed=You" />
-          <AvatarFallback>V</AvatarFallback>
+          <AvatarImage src={currentUser.avatar} />
+          <AvatarFallback>{currentUser.name[0]}</AvatarFallback>
         </Avatar>
         
         <div className="flex-1 space-y-2">
@@ -170,7 +136,7 @@ const CommentSection = ({ postId, currentUserId }: CommentSectionProps) => {
                     </span>
                   </div>
                   
-                  {canDeleteComment(comment) && (
+                  {canDeleteComment(comment, isAdmin) && (
                     <Button
                       variant="ghost"
                       size="icon"
