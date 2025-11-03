@@ -17,6 +17,7 @@ import Admin from "./pages/Admin";
 import AdminParticipants from "./pages/AdminParticipants";
 import AdminTrophies from "./pages/AdminTrophies";
 import PendingApproval from "./pages/PendingApproval";
+import Community from "./pages/Community";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -36,6 +37,7 @@ const App = () => (
             
             {/* User Routes - Accessible sans connexion */}
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/community" element={<Community />} />
             <Route path="/trophies" element={<Trophies />} />
             <Route path="/new-entry" element={<NewEntry />} />
             <Route path="/history" element={<History />} />

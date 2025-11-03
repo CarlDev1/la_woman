@@ -15,12 +15,14 @@ import {
   LogOut,
   Shield,
   Users,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const navItems = [
   { name: 'Tableau de bord', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Mes trophées', path: '/trophies', icon: Trophy },
   { name: 'Nouvelle saisie', path: '/new-entry', icon: PlusCircle },
   { name: 'Historique', path: '/history', icon: ScrollText },
@@ -30,9 +32,9 @@ const navItems = [
 
 const mobileNavItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Trophées', path: '/trophies', icon: Trophy },
+  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Saisir', path: '/new-entry', icon: PlusCircle, isCenter: true },
-  { name: 'Classement', path: '/leaderboard', icon: Award },
+  { name: 'Trophées', path: '/trophies', icon: Trophy },
   { name: 'Profil', path: '/profile', icon: User },
 ];
 
