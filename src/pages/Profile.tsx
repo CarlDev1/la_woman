@@ -29,7 +29,7 @@ export default function Profile() {
 
   const [fullName, setFullName] = useState(profile?.full_name || '');
   const [phone, setPhone] = useState(profile?.phone || '');
-  const [bio, setBio] = useState(profile?.bio || '');
+  const [activityDescription, setActivityDescription] = useState(profile?.activity_description || '');
   const [newAvatar, setNewAvatar] = useState<File | null>(null);
   const [newAvatarPreview, setNewAvatarPreview] = useState<string | null>(null);
 
@@ -57,21 +57,21 @@ export default function Profile() {
     setLoading(true);
 
     try {
-      let avatarUrl = profile?.avatar_url;
+      let avatarUrl = profile?.profile_photo_url;
 
       // Upload new avatar if selected
       if (newAvatar && user) {
         const avatarExt = newAvatar.name.split('.').pop();
-        const avatarPath = `${user.id}/avatar.${avatarExt}`;
+        const avatarPath = `${user.id}/profile_photo.${avatarExt}`;
         
         const { error: uploadError } = await supabase.storage
-          .from('avatars')
+          .from('profile-photos')
           .upload(avatarPath, newAvatar, { upsert: true });
 
         if (uploadError) throw uploadError;
 
         const { data: { publicUrl } } = supabase.storage
-          .from('avatars')
+          .from('profile-photos')
           .getPublicUrl(avatarPath);
 
         avatarUrl = publicUrl;
@@ -83,8 +83,8 @@ export default function Profile() {
         .update({
           full_name: fullName,
           phone,
-          bio,
-          avatar_url: avatarUrl,
+          activity_description: activityDescription,
+          profile_photo_url: avatarUrl,
         })
         .eq('id', user!.id);
 
@@ -181,7 +181,7 @@ export default function Profile() {
             <div className="flex flex-col items-center gap-4 sm:flex-row">
               <div className="relative">
                 <Avatar className="h-24 w-24 border-4 border-primary/20">
-                  <AvatarImage src={newAvatarPreview || profile?.avatar_url || ''} alt={profile?.full_name} />
+                  <AvatarImage src={newAvatarPreview || profile?.profile_photo_url || ''} alt={profile?.full_name} />
                   <AvatarFallback className="bg-primary/10 text-3xl text-primary">
                     {profile?.full_name?.charAt(0)}
                   </AvatarFallback>
@@ -251,15 +251,15 @@ export default function Profile() {
             {editing ? (
               <>
                 <Textarea
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
+                  value={activityDescription}
+                  onChange={(e) => setActivityDescription(e.target.value)}
                   rows={4}
                   minLength={20}
                 />
-                <p className="mt-2 text-xs text-muted-foreground">{bio.length} caractères</p>
+                <p className="mt-2 text-xs text-muted-foreground">{activityDescription.length} caractères</p>
               </>
             ) : (
-              <p className="text-muted-foreground">{profile?.bio}</p>
+              <p className="text-muted-foreground">{profile?.activity_description}</p>
             )}
           </CardContent>
         </Card>

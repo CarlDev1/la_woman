@@ -1,19 +1,29 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
-import DashboardLayout from '@/components/DashboardLayout';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Calendar } from '@/components/ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { toast } from 'sonner';
-import { Calendar as CalendarIcon, Loader2, Upload, X } from 'lucide-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
+import DashboardLayout from "@/components/DashboardLayout";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/lib/supabase";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Calendar as CalendarIcon, Loader2, Upload, X } from "lucide-react";
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export default function NewEntry() {
   const { user } = useAuth();
@@ -21,30 +31,30 @@ export default function NewEntry() {
   const [loading, setLoading] = useState(false);
 
   const [date, setDate] = useState<Date>();
-  const [revenue, setRevenue] = useState('');
-  const [profit, setProfit] = useState('');
-  const [adBudget, setAdBudget] = useState('');
+  const [revenue, setRevenue] = useState("");
+  const [profit, setProfit] = useState("");
+  const [adBudget, setAdBudget] = useState("");
   const [screenshot, setScreenshot] = useState<File | null>(null);
   const [screenshotPreview, setScreenshotPreview] = useState<string | null>(null);
 
   const formatNumberInput = (value: string) => {
-    const num = value.replace(/\D/g, '');
-    return num ? parseInt(num).toLocaleString('fr-FR') : '';
+    const num = value.replace(/\D/g, "");
+    return num ? parseInt(num).toLocaleString("fr-FR") : "";
   };
 
   const parseFormattedNumber = (value: string) => {
-    return parseInt(value.replace(/\s/g, '')) || 0;
+    return parseInt(value.replace(/\s/g, "")) || 0;
   };
 
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('La capture ne doit pas dépasser 5 MB');
+        toast.error("La capture ne doit pas dépasser 5 MB");
         return;
       }
-      if (!['image/jpeg', 'image/png'].includes(file.type)) {
-        toast.error('Format accepté : JPG ou PNG uniquement');
+      if (!["image/jpeg", "image/png"].includes(file.type)) {
+        toast.error("Format accepté : JPG ou PNG uniquement");
         return;
       }
       setScreenshot(file);
@@ -58,17 +68,17 @@ export default function NewEntry() {
     e.preventDefault();
 
     if (!date) {
-      toast.error('Veuillez sélectionner une date');
+      toast.error("Veuillez sélectionner une date");
       return;
     }
 
     if (!revenue || !profit) {
-      toast.error('Le CA et le bénéfice sont obligatoires');
+      toast.error("Le CA et le bénéfice sont obligatoires");
       return;
     }
 
     if (!screenshot) {
-      toast.error('La capture d\'écran est obligatoire');
+      toast.error("La capture d'écran est obligatoire");
       return;
     }
 
@@ -77,49 +87,52 @@ export default function NewEntry() {
     try {
       // Check if date already has an entry
       const { data: existing } = await supabase
-        .from('daily_results')
-        .select('id')
-        .eq('user_id', user!.id)
-        .eq('date', format(date, 'yyyy-MM-dd'))
+        .from("daily_results")
+        .select("id")
+        .eq("user_id", user!.id)
+        .eq("result_date", format(date, "yyyy-MM-dd"))
         .single();
 
       if (existing) {
-        toast.error('Vous avez déjà une saisie pour cette date');
+        toast.error("Vous avez déjà une saisie pour cette date");
         setLoading(false);
         return;
       }
 
       // Upload screenshot
-      const screenshotExt = screenshot.name.split('.').pop();
-      const screenshotPath = `${user!.id}/${format(date, 'yyyy-MM-dd')}_${Date.now()}.${screenshotExt}`;
-      
+      const screenshotExt = screenshot.name.split(".").pop();
+      const screenshotPath = `${user!.id}/${format(
+        date,
+        "yyyy-MM-dd"
+      )}_${Date.now()}.${screenshotExt}`;
+
       const { error: uploadError } = await supabase.storage
-        .from('screenshots')
+        .from("screenshots")
         .upload(screenshotPath, screenshot, { upsert: true });
 
       if (uploadError) throw uploadError;
 
-      const { data: { publicUrl } } = supabase.storage
-        .from('screenshots')
-        .getPublicUrl(screenshotPath);
+      const screenshotUrlToStore = screenshotPath;
 
       // Insert daily result
-      const { error: insertError } = await supabase.from('daily_results').insert({
-        user_id: user!.id,
-        date: format(date, 'yyyy-MM-dd'),
-        revenue: parseFormattedNumber(revenue),
-        profit: parseFormattedNumber(profit),
-        ad_budget: adBudget ? parseFormattedNumber(adBudget) : null,
-        screenshot_url: publicUrl,
-      });
+      const { error: insertError } = await supabase
+        .from("daily_results")
+        .insert({
+          user_id: user!.id,
+          result_date: format(date, "yyyy-MM-dd"),
+          revenue: parseFormattedNumber(revenue),
+          profit: parseFormattedNumber(profit),
+          ad_budget: adBudget ? parseFormattedNumber(adBudget) : null,
+          screenshot_url: screenshotUrlToStore,
+        });
 
       if (insertError) throw insertError;
 
-      toast.success('✅ Résultats enregistrés avec succès !');
-      navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Error saving entry:', error);
-      toast.error(error.message || 'Une erreur est survenue');
+      toast.success("Résultats enregistrés avec succès !");
+      navigate("/dashboard");
+    } catch (error) {
+      console.error("Error saving entry:", error);
+      toast.error(error.message || "Une erreur est survenue");
     } finally {
       setLoading(false);
     }
@@ -143,12 +156,14 @@ export default function NewEntry() {
                     <Button
                       variant="outline"
                       className={cn(
-                        'w-full justify-start text-left font-normal',
-                        !date && 'text-muted-foreground'
+                        "w-full justify-start text-left font-normal",
+                        !date && "text-muted-foreground"
                       )}
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                      {date ? format(date, 'PPP', { locale: fr }) : 'Sélectionner une date'}
+                      {date
+                        ? format(date, "PPP", { locale: fr })
+                        : "Sélectionner une date"}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -170,7 +185,9 @@ export default function NewEntry() {
                 <Input
                   id="revenue"
                   value={revenue}
-                  onChange={(e) => setRevenue(formatNumberInput(e.target.value))}
+                  onChange={(e) =>
+                    setRevenue(formatNumberInput(e.target.value))
+                  }
                   placeholder="Ex: 500 000"
                   required
                 />
@@ -182,7 +199,9 @@ export default function NewEntry() {
                 <Input
                   id="profit"
                   value={profit}
-                  onChange={(e) => setProfit(formatNumberInput(e.target.value))}
+                  onChange={(e) =>
+                    setProfit(formatNumberInput(e.target.value))
+                  }
                   placeholder="Ex: 150 000"
                   required
                 />
@@ -194,7 +213,9 @@ export default function NewEntry() {
                 <Input
                   id="adBudget"
                   value={adBudget}
-                  onChange={(e) => setAdBudget(formatNumberInput(e.target.value))}
+                  onChange={(e) =>
+                    setAdBudget(formatNumberInput(e.target.value))
+                  }
                   placeholder="Ex: 50 000"
                 />
               </div>
@@ -254,13 +275,13 @@ export default function NewEntry() {
                       Enregistrement...
                     </>
                   ) : (
-                    'Enregistrer'
+                    "Enregistrer"
                   )}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => navigate('/dashboard')}
+                  onClick={() => navigate("/dashboard")}
                   disabled={loading}
                 >
                   Annuler

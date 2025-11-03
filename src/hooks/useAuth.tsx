@@ -102,7 +102,17 @@ export function useAuth() {
   return context;
 }
 
-export function ProtectedRoute({ children, adminOnly = false }: { children: ReactNode; adminOnly?: boolean }) {
+type ProtectedRouteProps = {
+  children: ReactNode;
+  adminOnly?: boolean;
+  requireStatus?: 'active' | 'pending' | 'inactive';
+};
+
+export function ProtectedRoute({ 
+  children, 
+  adminOnly = false, 
+  requireStatus = 'active' 
+}: ProtectedRouteProps) {
   const { user, profile, loading } = useAuth();
   const navigate = useNavigate();
 
@@ -114,11 +124,15 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
         return;
       }
 
-      if (profile?.status !== 'active') {
+      if (requireStatus && profile?.status !== requireStatus) {
         if (profile?.status === 'pending') {
           toast.warning('⏳ Votre compte est en attente de validation');
         } else if (profile?.status === 'inactive') {
-          toast.error('❌ Votre compte a été désactivé');
+          if (requireStatus === 'active') {
+            toast.error('❌ Votre compte a été désactivé');
+          }
+        } else if (profile?.status === 'active' && requireStatus !== 'active') {
+          toast.error('Accès non autorisé à cette ressource');
         }
         navigate('/login');
         return;
@@ -127,6 +141,14 @@ export function ProtectedRoute({ children, adminOnly = false }: { children: Reac
       if (adminOnly && profile?.role !== 'admin') {
         toast.error('Accès réservé aux administrateurs');
         navigate('/dashboard');
+        return;
+      }
+
+      // Redirect admin users away from regular user routes, but allow access to community
+      if (!adminOnly && profile?.role === 'admin' && 
+          window.location.pathname.startsWith('/dashboard') && 
+          !window.location.pathname.startsWith('/community')) {
+        navigate('/admin/dashboard');
         return;
       }
     }
