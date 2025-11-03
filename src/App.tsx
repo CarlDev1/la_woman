@@ -1,39 +1,32 @@
-import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, ProtectedRoute, useAuth } from "@/hooks/useAuth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { AuthProvider, ProtectedRoute, useAuth } from "@/hooks/useAuth";
 import { useEffect } from "react";
-import {
-  BrowserRouter,
-  Route,
-  Routes,
-  useLocation,
-  useNavigate,
-} from "react-router-dom";
-import Admin from "./pages/Admin";
-import AdminParticipants from "./pages/AdminParticipants";
-import AdminTrophies from "./pages/AdminTrophies";
-import Community from "./pages/Community";
-import Dashboard from "./pages/Dashboard";
-import History from "./pages/History";
 import Landing from "./pages/Landing";
-import Leaderboard from "./pages/Leaderboard";
 import Login from "./pages/Login";
-import NewEntry from "./pages/NewEntry";
-import NotFound from "./pages/NotFound";
-import PendingApproval from "./pages/PendingApproval";
-import Profile from "./pages/Profile";
 import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
 import Trophies from "./pages/Trophies";
-import AdminDashboard from "./pages/admin/Dashboard";
-import PendingRegistrations from "./pages/admin/PendingRegistrations";
-import CreateProfile from "./pages/CreateProfile";
+import NewEntry from "./pages/NewEntry";
+import History from "./pages/History";
+import Leaderboard from "./pages/Leaderboard";
+import Profile from "./pages/Profile";
+import Community from "./pages/Community";
+import Admin from "./pages/Admin";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import AdminRoute from "./components/admin/AdminRoute";
-import AdminCommunity from "./pages/admin/Community";
+import CreateProfile from "./pages/CreateProfile";
+import AdminDashboard from "./pages/admin/Dashboard";
+import PendingRegistrations from "./pages/admin/PendingRegistrations";
+import AdminTrophies from "./pages/admin/Trophies";
+import AdminParticipants from "./pages/admin/Participants";
 import AdminProfile from "./pages/admin/Profile";
+import AdminCommunity from './pages/admin/Community';
+import AdminRoute from "./components/admin/AdminRoute";
+import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
@@ -46,19 +39,15 @@ const AutoRedirect = () => {
   useEffect(() => {
     if (!loading && profile) {
       const currentPath = location.pathname;
-
+      
       // If admin is on user routes, redirect to admin dashboard
-      if (
-        profile.role === "admin" &&
-        currentPath.startsWith("/dashboard") &&
-        currentPath !== "/admin/dashboard"
-      ) {
-        navigate("/admin/dashboard", { replace: true });
+      if (profile.role === 'admin' && currentPath.startsWith('/dashboard') && currentPath !== '/admin/dashboard') {
+        navigate('/admin/dashboard', { replace: true });
       }
-
+      
       // If user is on admin routes, redirect to user dashboard
-      if (profile.role === "user" && currentPath.startsWith("/admin")) {
-        navigate("/dashboard", { replace: true });
+      if (profile.role === 'user' && currentPath.startsWith('/admin')) {
+        navigate('/dashboard', { replace: true });
       }
     }
   }, [profile, loading, navigate, location.pathname]);

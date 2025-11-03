@@ -22,20 +22,19 @@ import { toast } from 'sonner';
 
 const navItems = [
   { name: 'Tableau de bord', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Mes trophées', path: '/trophies', icon: Trophy },
   { name: 'Nouvelle saisie', path: '/new-entry', icon: PlusCircle },
   { name: 'Historique', path: '/history', icon: ScrollText },
   { name: 'Classement', path: '/leaderboard', icon: Award },
-  { name: 'Communauté', path: '/community', icon: Users },
+  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Mon profil', path: '/profile', icon: User },
 ];
 
 const mobileNavItems = [
   { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Saisir', path: '/new-entry', icon: PlusCircle, isCenter: true },
   { name: 'Trophées', path: '/trophies', icon: Trophy },
+  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Profil', path: '/profile', icon: User },
 ];
 
