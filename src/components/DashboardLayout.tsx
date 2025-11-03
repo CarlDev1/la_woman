@@ -15,12 +15,14 @@ import {
   LogOut,
   Shield,
   Users,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const navItems = [
   { name: 'Tableau de bord', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Mes trophées', path: '/trophies', icon: Trophy },
   { name: 'Nouvelle saisie', path: '/new-entry', icon: PlusCircle },
   { name: 'Historique', path: '/history', icon: ScrollText },
@@ -30,11 +32,11 @@ const navItems = [
 ];
 
 const mobileNavItems = [
-  { name: 'Accueil', path: '/dashboard', icon: LayoutDashboard },
-  { name: 'Trophées', path: '/trophies', icon: Trophy },
+  { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+  { name: 'Communauté', path: '/community', icon: MessageSquare },
   { name: 'Saisir', path: '/new-entry', icon: PlusCircle, isCenter: true },
-  { name: 'Classement', path: '/leaderboard', icon: Award },
-  { name: 'Communauté', path: '/community', icon: Users },
+  { name: 'Trophées', path: '/trophies', icon: Trophy },
+  { name: 'Profil', path: '/profile', icon: User },
 ];
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
@@ -130,6 +132,30 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
                 >
                   <Shield className="h-5 w-5" />
                   Administration
+                </Link>
+                <Link
+                  to="/admin/participants"
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive('/admin/participants')
+                      ? 'border-l-4 border-primary bg-primary/5 text-primary'
+                      : 'text-muted-foreground hover:bg-primary/5 hover:text-foreground'
+                  )}
+                >
+                  <Users className="h-5 w-5" />
+                  Participantes
+                </Link>
+                <Link
+                  to="/admin/trophies"
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                    isActive('/admin/trophies')
+                      ? 'border-l-4 border-primary bg-primary/5 text-primary'
+                      : 'text-muted-foreground hover:bg-primary/5 hover:text-foreground'
+                  )}
+                >
+                  <Trophy className="h-5 w-5" />
+                  Trophées
                 </Link>
               </>
             )}

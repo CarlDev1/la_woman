@@ -1,255 +1,191 @@
-import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabase';
-import { useAuth } from '@/hooks/useAuth';
-import { uploadPostImage, deletePostImage, togglePostLike } from '@/lib/community-api';
-import type { Post, CreatePostData, UpdatePostData } from '@/types/community';
+import { useState } from "react";
+
+export interface PostAuthor {
+  id: string;
+  name: string;
+  avatar: string;
+  isAdmin: boolean;
+}
+
+export interface Post {
+  id: string;
+  author: PostAuthor;
+  content: string;
+  imageUrl: string | null;
+  createdAt: Date;
+  updatedAt?: Date;
+  likesCount: number;
+  commentsCount: number;
+  isLiked: boolean;
+}
+
+export interface Comment {
+  id: string;
+  postId: string;
+  author: PostAuthor;
+  content: string;
+  createdAt: Date;
+}
+
+// Mock current user - TODO: Remplacer par le vrai user connecté
+const CURRENT_USER: PostAuthor = {
+  id: "user1",
+  name: "Vous",
+  avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=You",
+  isAdmin: false
+};
 
 export const usePosts = () => {
-  const { user, profile } = useAuth();
-  const [posts, setPosts] = useState<Post[]>([]);
-  const [allPosts, setAllPosts] = useState<Post[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch all posts
-  const fetchPosts = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      
-      const { data, error: fetchError } = await supabase
-        .from('posts_with_stats')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (fetchError) throw fetchError;
-      
-      const postsData = data || [];
-      setAllPosts(postsData);
-      setPosts(postsData);
-    } catch (err) {
-      console.error('Error fetching posts:', err);
-      setError('Erreur lors du chargement des publications');
-    } finally {
-      setLoading(false);
+  const [posts, setPosts] = useState<Post[]>([
+    {
+      id: "1",
+      author: {
+        id: "user1",
+        name: "Sophie Martin",
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Sophie",
+        isAdmin: false
+      },
+      content: "Je viens de terminer ma première semaine de défi ! Tellement fière de moi 💪 Qui d'autre est motivée ?",
+      imageUrl: null,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+      likesCount: 12,
+      commentsCount: 5,
+      isLiked: false
+    },
+    {
+      id: "2",
+      author: {
+        id: "admin1",
+        name: "Julie Coach",
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Julie",
+        isAdmin: true
+      },
+      content: "Astuce du jour : N'oubliez pas de célébrer chaque petite victoire ! 🎉 Partagez vos réussites de la semaine en commentaire ⬇️",
+      imageUrl: "https://images.unsplash.com/photo-1518611012118-696072aa579a?w=800&auto=format&fit=crop",
+      createdAt: new Date(Date.now() - 5 * 60 * 60 * 1000),
+      likesCount: 28,
+      commentsCount: 15,
+      isLiked: true
+    },
+    {
+      id: "3",
+      author: {
+        id: "user2",
+        name: "Emma Dupont",
+        avatar: "https://api.dicebear.com/7.x/avataaars/svg?seed=Emma",
+        isAdmin: false
+      },
+      content: "Besoin de conseils : comment rester motivée quand on a une semaine chargée au travail ? 🤔",
+      imageUrl: null,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
+      likesCount: 8,
+      commentsCount: 12,
+      isLiked: false
     }
-  }, []);
+  ]);
 
-  // Filter posts based on search query
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setPosts(allPosts);
-      return;
-    }
+  const [searchQuery, setSearchQuery] = useState("");
 
-    const query = searchQuery.toLowerCase();
-    const filtered = allPosts.filter(
-      post => 
-        (post.content?.toLowerCase().includes(query)) ||
-        post.author_name.toLowerCase().includes(query)
-    );
+  const createPost = async (content: string, imageFile?: File) => {
+    // TODO: Upload image et créer post en DB
+    const newPost: Post = {
+      id: Date.now().toString(),
+      author: CURRENT_USER,
+      content,
+      imageUrl: imageFile ? URL.createObjectURL(imageFile) : null, // Mock - sera remplacé par l'URL Supabase
+      createdAt: new Date(),
+      likesCount: 0,
+      commentsCount: 0,
+      isLiked: false
+    };
     
-    setPosts(filtered);
-  }, [searchQuery, allPosts]);
-
-  // Initial fetch
-  useEffect(() => {
-    fetchPosts();
-  }, [fetchPosts]);
-
-  // Create a new post
-  const createPost = async ({ content, imageFile }: CreatePostData) => {
-    try {
-      if (!user) throw new Error('Utilisateur non connecté');
-      if (!content?.trim() && !imageFile) {
-        throw new Error('Le contenu ou une image est requis');
-      }
-      if (content && content.trim().length < 10 && !imageFile) {
-        throw new Error('Le texte doit contenir au moins 10 caractères');
-      }
-
-      setLoading(true);
-      
-      let imageUrl: string | null = null;
-      if (imageFile) {
-        imageUrl = await uploadPostImage(imageFile, user.id);
-      }
-
-      const { data, error: insertError } = await supabase
-        .from('posts')
-        .insert({
-          user_id: user.id,
-          content: content?.trim() || null,
-          image_url: imageUrl
-        })
-        .select()
-        .single();
-
-      if (insertError) throw insertError;
-
-      // Refresh posts
-      await fetchPosts();
-      return data;
-    } catch (err) {
-      console.error('Error creating post:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    setPosts([newPost, ...posts]);
+    return newPost;
   };
 
-  // Update an existing post
-  const updatePost = async ({ id, content, imageFile, currentImageUrl }: UpdatePostData) => {
-    try {
-      if (!user) throw new Error('Utilisateur non connecté');
-      if (!content?.trim() && !imageFile && !currentImageUrl) {
-        throw new Error('Le contenu ou une image est requis');
-      }
-      if (content && content.trim().length < 10 && !imageFile && !currentImageUrl) {
-        throw new Error('Le texte doit contenir au moins 10 caractères');
-      }
-
-      setLoading(true);
-      
-      let imageUrl = currentImageUrl || null;
-      
-      // Upload new image if provided
-      if (imageFile) {
-        // Delete old image if exists
-        if (currentImageUrl) {
-          await deletePostImage(currentImageUrl);
-        }
-        imageUrl = await uploadPostImage(imageFile, user.id);
-      }
-
-      const updateData: any = {};
-      if (content !== undefined) {
-        updateData.content = content.trim() || null;
-      }
-      if (imageUrl !== undefined) {
-        updateData.image_url = imageUrl;
-      }
-
-      const { data, error: updateError } = await supabase
-        .from('posts')
-        .update(updateData)
-        .eq('id', id)
-        .select()
-        .single();
-
-      if (updateError) throw updateError;
-
-      // Refresh posts
-      await fetchPosts();
-      return data;
-    } catch (err) {
-      console.error('Error updating post:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+  const updatePost = async (postId: string, content: string, imageFile?: File) => {
+    // TODO: Update post en DB
+    setPosts(posts.map(post => 
+      post.id === postId 
+        ? { 
+            ...post, 
+            content, 
+            imageUrl: imageFile ? URL.createObjectURL(imageFile) : post.imageUrl,
+            updatedAt: new Date()
+          }
+        : post
+    ));
   };
 
-  // Delete a post
   const deletePost = async (postId: string) => {
-    try {
-      setLoading(true);
-      
-      // Get the post to delete its image if it has one
-      const postToDelete = allPosts.find(post => post.id === postId);
-      if (postToDelete?.image_url) {
-        await deletePostImage(postToDelete.image_url);
-      }
-
-      const { error } = await supabase
-        .from('posts')
-        .delete()
-        .eq('id', postId);
-
-      if (error) throw error;
-
-      // Update local state
-      setAllPosts(prev => prev.filter(post => post.id !== postId));
-      setPosts(prev => prev.filter(post => post.id !== postId));
-    } catch (err) {
-      console.error('Error deleting post:', err);
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    // TODO: Delete post en DB
+    setPosts(posts.filter(post => post.id !== postId));
   };
 
-  // Toggle like on a post
   const toggleLike = async (postId: string) => {
-    if (!user) return;
-    
+    // Optimistic update
+    setPosts(posts.map(post => 
+      post.id === postId 
+        ? { 
+            ...post, 
+            isLiked: !post.isLiked, 
+            likesCount: post.isLiked ? post.likesCount - 1 : post.likesCount + 1 
+          }
+        : post
+    ));
+
     try {
-      // Optimistic update
-      const wasLiked = posts.find(p => p.id === postId)?.is_liked_by_current_user;
-      
-      setPosts(prev =>
-        prev.map(post =>
-          post.id === postId
-            ? {
-                ...post,
-                like_count: wasLiked ? post.like_count - 1 : post.like_count + 1,
-                is_liked_by_current_user: !wasLiked,
-              }
-            : post
-        )
-      );
-
-      setAllPosts(prev =>
-        prev.map(post =>
-          post.id === postId
-            ? {
-                ...post,
-                like_count: wasLiked ? post.like_count - 1 : post.like_count + 1,
-                is_liked_by_current_user: !wasLiked,
-              }
-            : post
-        )
-      );
-
-      // Call the API
-      await togglePostLike(postId, user.id);
-    } catch (err) {
-      console.error('Error toggling like:', err);
-      // Revert optimistic update on error
-      fetchPosts();
-    }
-  };
-
-  // Update comment count
-  const updateCommentCount = (postId: string, increment: boolean) => {
-    const updateCount = (prevPosts: Post[]) =>
-      prevPosts.map(post =>
-        post.id === postId
-          ? {
-              ...post,
-              comment_count: increment
-                ? post.comment_count + 1
-                : Math.max(0, post.comment_count - 1),
+      // TODO: Toggle like en DB
+      console.log("Toggle like for post:", postId);
+    } catch (error) {
+      // Rollback en cas d'erreur
+      setPosts(posts.map(post => 
+        post.id === postId 
+          ? { 
+              ...post, 
+              isLiked: !post.isLiked, 
+              likesCount: post.isLiked ? post.likesCount + 1 : post.likesCount - 1 
             }
           : post
-      );
-
-    setPosts(updateCount);
-    setAllPosts(updateCount);
+      ));
+      throw error;
+    }
   };
 
+  const incrementCommentCount = (postId: string) => {
+    setPosts(posts.map(post => 
+      post.id === postId 
+        ? { ...post, commentsCount: post.commentsCount + 1 }
+        : post
+    ));
+  };
+
+  const decrementCommentCount = (postId: string) => {
+    setPosts(posts.map(post => 
+      post.id === postId 
+        ? { ...post, commentsCount: Math.max(0, post.commentsCount - 1) }
+        : post
+    ));
+  };
+
+  // Filtrer les posts par recherche
+  const filteredPosts = searchQuery.trim()
+    ? posts.filter(post => 
+        post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        post.author.name.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : posts;
+
   return {
-    posts,
-    loading,
-    error,
+    posts: filteredPosts,
+    currentUser: CURRENT_USER,
     searchQuery,
     setSearchQuery,
     createPost,
     updatePost,
     deletePost,
     toggleLike,
-    updateCommentCount,
-    refreshPosts: fetchPosts,
+    incrementCommentCount,
+    decrementCommentCount
   };
 };

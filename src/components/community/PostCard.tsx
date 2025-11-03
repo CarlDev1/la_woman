@@ -1,214 +1,246 @@
-import { useState, lazy, Suspense } from 'react';
-import { formatRelativeDate } from '@/lib/date-utils';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Heart, MessageCircle, MoreHorizontal, X } from 'lucide-react';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { useAuth } from '@/hooks/useAuth';
-import { Post } from '@/types/community';
-import { cn } from '@/lib/utils';
-
-// Lazy load CommentSection to avoid circular dependencies
-const CommentSection = lazy(() => import('./CommentSection'));
+import { useState } from "react";
+import { Heart, MessageSquare, Share2, MoreVertical, Trash2, Edit } from "lucide-react";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import CommentSection from "./CommentSection";
+import ImageModal from "./ImageModal";
+import EditPostModal from "./EditPostModal";
+import { toast } from "sonner";
+import { Post } from "@/hooks/usePosts";
 
 interface PostCardProps {
   post: Post;
+  currentUserId: string;
   onToggleLike: (postId: string) => void;
+  onUpdate: (postId: string, content: string, imageFile?: File) => void;
   onDelete: (postId: string) => void;
-  onCommentAdded: () => void;
-  onCommentDeleted: () => void;
-  onEdit: (post: Post) => void;
+  onCommentAdded: (postId: string) => void;
+  onCommentDeleted: (postId: string) => void;
 }
 
-export default function PostCard({
-  post,
-  onToggleLike,
+const PostCard = ({ 
+  post, 
+  currentUserId, 
+  onToggleLike, 
+  onUpdate,
   onDelete,
   onCommentAdded,
-  onCommentDeleted,
-  onEdit,
-}: PostCardProps) {
-  const { user } = useAuth();
+  onCommentDeleted
+}: PostCardProps) => {
   const [showComments, setShowComments] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [showImageModal, setShowImageModal] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  
+  const isOwnPost = post.author.id === currentUserId;
+  const needsExpansion = post.content.length > 200;
+  const displayContent = needsExpansion && !isExpanded 
+    ? post.content.slice(0, 200) + "..." 
+    : post.content;
 
-  const isAuthor = user?.id === post.user_id;
-  const hasImage = !!post.image_url;
+  const formatDate = (date: Date) => {
+    const now = new Date();
+    const diffInHours = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60));
+    
+    if (diffInHours < 1) {
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+      return `Il y a ${diffInMinutes} min`;
+    }
+    if (diffInHours < 24) return `Il y a ${diffInHours}h`;
+    if (diffInHours < 48) return "Hier";
+    
+    const diffInDays = Math.floor(diffInHours / 24);
+    return `Il y a ${diffInDays} jours`;
+  };
 
   const handleLike = () => {
     onToggleLike(post.id);
   };
 
-  const handleDelete = async () => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer cette publication ?')) {
-      try {
-        setIsDeleting(true);
-        await onDelete(post.id);
-      } catch (error) {
-        console.error('Error deleting post:', error);
-      } finally {
-        setIsDeleting(false);
-      }
-    }
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href + `/post/${post.id}`);
+    toast.success("Lien copié dans le presse-papier");
   };
 
-  const handleEdit = () => {
-    onEdit(post);
+  const handleDelete = () => {
+    onDelete(post.id);
+    setShowDeleteDialog(false);
+    toast.success("Post supprimé");
   };
 
   return (
-    <Card className="overflow-hidden">
-      <CardHeader className="p-4 pb-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-3">
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={post.author_photo || ''} alt={post.author_name} />
-              <AvatarFallback>
-                {post.author_name
-                  .split(' ')
-                  .map((n) => n[0])
-                  .join('')}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-medium">{post.author_name}</span>
-                {post.author_role === 'admin' && (
-                  <Badge variant="secondary" className="bg-pink-100 text-pink-700">
-                    Admin
-                  </Badge>
-                )}
+    <>
+      <Card className="overflow-hidden hover:shadow-lg transition-shadow animate-fade-in">
+        <CardHeader className="p-4">
+          <div className="flex items-start justify-between">
+            <div className="flex items-center gap-3">
+              <Avatar className="w-12 h-12">
+                <AvatarImage src={post.author.avatar} alt={post.author.name} />
+                <AvatarFallback>{post.author.name[0]}</AvatarFallback>
+              </Avatar>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-base">{post.author.name}</span>
+                  {post.author.isAdmin && (
+                    <Badge className="bg-primary text-primary-foreground text-xs uppercase">
+                      Admin
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-xs text-muted-foreground">{formatDate(post.createdAt)}</span>
               </div>
-              <span className="text-xs text-muted-foreground">
-                {formatRelativeDate(post.created_at)}
-              </span>
             </div>
-          </div>
-          
-          {(isAuthor || user?.role === 'admin') && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {isAuthor && (
-                  <DropdownMenuItem onClick={handleEdit}>
+            
+            {isOwnPost && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="icon">
+                    <MoreVertical className="w-4 h-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setShowEditModal(true)}>
+                    <Edit className="w-4 h-4 mr-2" />
                     Modifier
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem 
-                  onClick={handleDelete} 
-                  className="text-red-600 focus:text-red-600"
-                  disabled={isDeleting}
-                >
-                  {isDeleting ? 'Suppression...' : 'Supprimer'}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-4 pt-0">
-        {post.content && (
-          <p className="mb-4 whitespace-pre-line">{post.content}</p>
-        )}
-        
-        {hasImage && (
-          <div 
-            className="relative rounded-md overflow-hidden bg-muted cursor-pointer"
-            onClick={() => setShowImageModal(true)}
-          >
-            <img
-              src={post.image_url!}
-              alt="Post content"
-              className="w-full h-auto object-cover"
-              style={{ aspectRatio: '16/9' }}
-              loading="lazy"
-            />
-          </div>
-        )}
-      </CardContent>
-
-      <CardFooter className="p-4 pt-0">
-        <div className="flex items-center justify-between w-full">
-          <Button
-            variant="ghost"
-            size="sm"
-            className={cn(
-              'flex items-center space-x-1',
-              post.is_liked_by_current_user ? 'text-red-500' : 'text-muted-foreground'
+                  <DropdownMenuItem
+                    className="text-destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Supprimer
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-            onClick={handleLike}
-          >
-            <Heart
-              className={cn(
-                'h-5 w-5',
-                post.is_liked_by_current_user ? 'fill-current' : ''
-              )}
-            />
-            <span>{post.like_count}</span>
-          </Button>
-          
-          <Button
-            variant="ghost"
-            size="sm"
-            className="flex items-center space-x-1 text-muted-foreground"
-            onClick={() => setShowComments(!showComments)}
-          >
-            <MessageCircle className="h-5 w-5" />
-            <span>{post.comment_count}</span>
-          </Button>
-        </div>
-      </CardFooter>
-
-      {/* Comments Section */}
-      <Suspense fallback={<div className="mt-3 p-4 text-center text-gray-500">Chargement des commentaires...</div>}>
-        {showComments && (
-          <div className="mt-3 border-t border-gray-200 pt-3">
-            <CommentSection 
-              postId={post.id} 
-              onCommentAdded={onCommentAdded}
-              onCommentDeleted={onCommentDeleted}
-            />
           </div>
-        )}
-      </Suspense>
+        </CardHeader>
 
-      {/* Image Modal */}
-      {showImageModal && hasImage && (
-        <div 
-          className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center p-4"
-          onClick={() => setShowImageModal(false)}
-        >
-          <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="absolute top-4 right-4 z-10 h-10 w-10 rounded-full bg-black/50 text-white hover:bg-black/70"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowImageModal(false);
-              }}
+        <CardContent className="p-0">
+          {post.imageUrl && (
+            <div 
+              className="w-full max-h-96 overflow-hidden cursor-pointer"
+              onClick={() => setShowImageModal(true)}
             >
-              <X className="h-5 w-5" />
-            </Button>
-            <div className="max-w-full max-h-[80vh] flex items-center justify-center">
-              <img
-                src={post.image_url}
-                alt="Post content full size"
-                className="max-w-full max-h-[80vh] object-contain"
-                onClick={(e) => e.stopPropagation()}
+              <img 
+                src={post.imageUrl} 
+                alt="Post" 
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
               />
             </div>
+          )}
+          
+          <div className="p-4">
+            <p className="text-sm text-foreground whitespace-pre-wrap">
+              {displayContent}
+            </p>
+            {needsExpansion && (
+              <button
+                onClick={() => setIsExpanded(!isExpanded)}
+                className="text-primary text-sm font-medium mt-2 hover:underline"
+              >
+                {isExpanded ? "Voir moins" : "Voir plus..."}
+              </button>
+            )}
           </div>
-        </div>
+        </CardContent>
+
+        <CardFooter className="p-4 pt-0 flex flex-col gap-4">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLike}
+              className={post.isLiked ? "text-red-500" : ""}
+            >
+              <Heart 
+                className={`w-4 h-4 mr-1 ${post.isLiked ? "fill-current" : ""}`}
+              />
+              {post.likesCount}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowComments(!showComments)}
+            >
+              <MessageSquare className="w-4 h-4 mr-1" />
+              {post.commentsCount}
+            </Button>
+            
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleShare}
+            >
+              <Share2 className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {showComments && (
+            <CommentSection 
+              postId={post.id}
+              currentUserId={currentUserId}
+              onCommentAdded={() => onCommentAdded(post.id)}
+              onCommentDeleted={() => onCommentDeleted(post.id)}
+            />
+          )}
+        </CardFooter>
+      </Card>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Supprimer ce post ?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cette action est irréversible. Le post sera définitivement supprimé.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Annuler</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              Supprimer
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <EditPostModal
+        open={showEditModal}
+        onOpenChange={setShowEditModal}
+        onSubmit={(content, imageFile) => onUpdate(post.id, content, imageFile)}
+        initialContent={post.content}
+        initialImageUrl={post.imageUrl}
+      />
+
+      {post.imageUrl && (
+        <ImageModal
+          imageUrl={post.imageUrl}
+          open={showImageModal}
+          onOpenChange={setShowImageModal}
+        />
       )}
-    </Card>
+    </>
   );
-}
+};
+
+export default PostCard;

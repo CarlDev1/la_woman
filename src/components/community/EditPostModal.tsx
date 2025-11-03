@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { X, Upload, Image as ImageIcon } from "lucide-react";
 import {
   Dialog,
@@ -11,38 +11,54 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-interface CreatePostModalProps {
+interface EditPostModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: (content: string, imageFile?: File) => void;
+  initialContent: string;
+  initialImageUrl: string | null;
 }
 
-const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps) => {
-  const [content, setContent] = useState("");
+const EditPostModal = ({ 
+  open, 
+  onOpenChange, 
+  onSubmit, 
+  initialContent,
+  initialImageUrl 
+}: EditPostModalProps) => {
+  const [content, setContent] = useState(initialContent);
   const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(initialImageUrl);
+  const [removeExistingImage, setRemoveExistingImage] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (open) {
+      setContent(initialContent);
+      setImagePreview(initialImageUrl);
+      setImageFile(null);
+      setRemoveExistingImage(false);
+    }
+  }, [open, initialContent, initialImageUrl]);
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Vérifier le type de fichier
     if (!file.type.startsWith("image/")) {
       toast.error("Veuillez sélectionner une image (JPG ou PNG)");
       return;
     }
 
-    // Vérifier la taille (5MB max)
     if (file.size > 5 * 1024 * 1024) {
       toast.error("L'image ne doit pas dépasser 5MB");
       return;
     }
 
     setImageFile(file);
+    setRemoveExistingImage(false);
     
-    // Créer une preview
     const reader = new FileReader();
     reader.onloadend = () => {
       setImagePreview(reader.result as string);
@@ -53,14 +69,14 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
   const handleRemoveImage = () => {
     setImageFile(null);
     setImagePreview(null);
+    setRemoveExistingImage(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
   };
 
   const handleSubmit = async () => {
-    // Validation
-    if (!imageFile && content.trim().length < 10) {
+    if (!imagePreview && content.trim().length < 10) {
       toast.error("Veuillez ajouter une image ou au moins 10 caractères de texte");
       return;
     }
@@ -74,30 +90,22 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
     
     try {
       await onSubmit(content, imageFile || undefined);
-      
-      // Reset form
-      setContent("");
-      setImageFile(null);
-      setImagePreview(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      
-      toast.success("✅ Post publié avec succès !");
+      toast.success("✅ Post modifié avec succès !");
+      onOpenChange(false);
     } catch (error) {
-      toast.error("Erreur lors de la publication");
+      toast.error("Erreur lors de la modification");
     } finally {
       setIsUploading(false);
     }
   };
 
-  const isFormValid = imageFile || content.trim().length >= 10;
+  const isFormValid = imagePreview || content.trim().length >= 10;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Créer un post</DialogTitle>
+          <DialogTitle>Modifier le post</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4 py-4">
@@ -109,7 +117,7 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
               accept="image/jpeg,image/png,image/jpg"
               onChange={handleImageSelect}
               className="hidden"
-              id="image-upload"
+              id="edit-image-upload"
             />
             
             {imagePreview ? (
@@ -130,7 +138,7 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
               </div>
             ) : (
               <label
-                htmlFor="image-upload"
+                htmlFor="edit-image-upload"
                 className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
               >
                 <div className="flex flex-col items-center justify-center pt-5 pb-6">
@@ -157,7 +165,7 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
             />
             <div className="flex justify-between items-center mt-2">
               <span className="text-xs text-muted-foreground">
-                {!imageFile && content.trim().length < 10 && (
+                {!imagePreview && content.trim().length < 10 && (
                   <span className="text-destructive">
                     Minimum 10 caractères ou une image requis
                   </span>
@@ -185,10 +193,10 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
             {isUploading ? (
               <>
                 <Upload className="w-4 h-4 mr-2 animate-spin" />
-                Publication...
+                Modification...
               </>
             ) : (
-              "Publier"
+              "Modifier"
             )}
           </Button>
         </DialogFooter>
@@ -197,4 +205,4 @@ const CreatePostModal = ({ open, onOpenChange, onSubmit }: CreatePostModalProps)
   );
 };
 
-export default CreatePostModal;
+export default EditPostModal;
