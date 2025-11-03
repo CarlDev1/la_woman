@@ -38,9 +38,9 @@ export default function Leaderboard() {
         .select(`
           user_id,
           revenue,
-          profiles!inner(full_name, avatar_url, status)
+          profiles!inner(full_name, profile_photo_url, status)
         `)
-        .gte('date', monthStart)
+        .gte('result_date', monthStart)
         .eq('profiles.status', 'active');
 
       if (revenueData) {
@@ -49,7 +49,7 @@ export default function Leaderboard() {
             acc[item.user_id] = {
               userId: item.user_id,
               fullName: item.profiles.full_name,
-              avatarUrl: item.profiles.avatar_url,
+              avatarUrl: item.profiles.profile_photo_url,
               total: 0,
             };
           }
@@ -67,9 +67,9 @@ export default function Leaderboard() {
         .select(`
           user_id,
           profit,
-          profiles!inner(full_name, avatar_url, status)
+          profiles!inner(full_name, profile_photo_url, status)
         `)
-        .gte('date', monthStart)
+        .gte('result_date', monthStart)
         .eq('profiles.status', 'active');
 
       if (profitData) {
@@ -78,7 +78,7 @@ export default function Leaderboard() {
             acc[item.user_id] = {
               userId: item.user_id,
               fullName: item.profiles.full_name,
-              avatarUrl: item.profiles.avatar_url,
+              avatarUrl: item.profiles.profile_photo_url,
               total: 0,
             };
           }
@@ -95,7 +95,7 @@ export default function Leaderboard() {
         .from('user_trophies')
         .select(`
           user_id,
-          profiles!inner(full_name, avatar_url, status)
+          profiles!inner(full_name, profile_photo_url, status)
         `)
         .eq('profiles.status', 'active');
 
@@ -105,7 +105,7 @@ export default function Leaderboard() {
             acc[item.user_id] = {
               userId: item.user_id,
               fullName: item.profiles.full_name,
-              avatarUrl: item.profiles.avatar_url,
+              avatarUrl: item.profiles.profile_photo_url,
               total: 0,
               trophyCount: 0,
             };

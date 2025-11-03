@@ -1,20 +1,4 @@
-import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase, DailyResult } from '@/lib/supabase';
-import DashboardLayout from '@/components/DashboardLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Camera, Trash2, Edit, Download } from 'lucide-react';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import { toast } from 'sonner';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import DashboardLayout from "@/components/DashboardLayout";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +8,22 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/useAuth";
+import { DailyResult, supabase } from "@/lib/supabase";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Camera, Download, Loader2, Trash2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 
 export default function History() {
   const { user } = useAuth();
@@ -32,15 +31,42 @@ export default function History() {
   const [loading, setLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const ITEMS_PER_PAGE = 20;
+
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const [isSigningUrl, setIsSigningUrl] = useState(false);
 
   useEffect(() => {
     if (user) {
       fetchResults();
     }
   }, [user, currentPage]);
+
+  useEffect(() => {
+    if (selectedImage) {
+      const getSignedUrl = async () => {
+        setIsSigningUrl(true);
+        setSignedUrl(null);
+        try {
+          const { data, error } = await supabase.storage
+            .from("screenshots")
+            .createSignedUrl(selectedImage, 3600);
+
+          if (error) throw error;
+
+          setSignedUrl(data.signedUrl);
+        } catch (error) {
+          toast.error(`Erreur de génération de lien: ${error.message}`);
+          setSelectedImage(null);
+        } finally {
+          setIsSigningUrl(false);
+        }
+      };
+      getSignedUrl();
+    }
+  }, [selectedImage]);
 
   const fetchResults = async () => {
     if (!user) return;
@@ -50,10 +76,10 @@ export default function History() {
       const to = from + ITEMS_PER_PAGE - 1;
 
       const { data, error, count } = await supabase
-        .from('daily_results')
-        .select('*', { count: 'exact' })
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
+        .from("daily_results")
+        .select("*", { count: "exact" })
+        .eq("user_id", user.id)
+        .order("result_date", { ascending: false })
         .range(from, to);
 
       if (error) throw error;
@@ -61,8 +87,8 @@ export default function History() {
       setResults(data || []);
       setTotalPages(Math.ceil((count || 0) / ITEMS_PER_PAGE));
     } catch (error) {
-      console.error('Error fetching results:', error);
-      toast.error('Erreur lors du chargement des résultats');
+      console.error("Error fetching results:", error);
+      toast.error("Erreur lors du chargement des résultats");
     } finally {
       setLoading(false);
     }
@@ -72,17 +98,24 @@ export default function History() {
     if (!deleteId) return;
 
     try {
+      const resultToDelete = results.find((r) => r.id === deleteId);
+      if (resultToDelete?.screenshot_url) {
+        await supabase.storage
+          .from("screenshots")
+          .remove([resultToDelete.screenshot_url]);
+      }
+
       const { error } = await supabase
-        .from('daily_results')
+        .from("daily_results")
         .delete()
-        .eq('id', deleteId);
+        .eq("id", deleteId);
 
       if (error) throw error;
 
-      toast.success('Saisie supprimée');
+      toast.success("Saisie supprimée");
       fetchResults();
-    } catch (error: any) {
-      toast.error(error.message || 'Erreur lors de la suppression');
+    } catch (error) {
+      toast.error(error.message || "Erreur lors de la suppression");
     } finally {
       setDeleteId(null);
     }
@@ -96,31 +129,34 @@ export default function History() {
   };
 
   const exportToCSV = () => {
-    const headers = ['Date', 'CA', 'Bénéfice', 'Budget pub'];
+    const headers = ["Date", "CA", "Bénéfice", "Budget pub"];
     const rows = results.map((r) => [
-      format(new Date(r.date), 'dd/MM/yyyy'),
+      format(new Date(r.result_date), "dd/MM/yyyy"),
       r.revenue,
       r.profit,
       r.ad_budget || 0,
     ]);
 
-    const csv = [headers, ...rows].map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
+    const csv = [headers, ...rows].map((row) => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
     const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `historique_${format(new Date(), 'yyyy-MM-dd')}.csv`;
+    a.download = `historique_${format(new Date(), "yyyy-MM-dd")}.csv`;
     a.click();
   };
 
   const formatCurrency = (value: number) => {
-    return value.toLocaleString('fr-FR') + ' FCFA';
+    return value.toLocaleString("fr-FR") + " FCFA";
   };
 
   const totalRevenue = results.reduce((sum, r) => sum + r.revenue, 0);
   const totalProfit = results.reduce((sum, r) => sum + r.profit, 0);
   const avgRevenue = results.length > 0 ? totalRevenue / results.length : 0;
-  const bestDay = results.reduce((max, r) => (r.revenue > (max?.revenue || 0) ? r : max), results[0]);
+  const bestDay = results.reduce(
+    (max, r) => (r.revenue > (max?.revenue || 0) ? r : max),
+    results[0]
+  );
 
   if (loading) {
     return (
@@ -175,11 +211,13 @@ export default function History() {
             </CardHeader>
             <CardContent>
               <div className="text-xl font-bold">
-                {bestDay ? formatCurrency(bestDay.revenue) : '-'}
+                {bestDay ? formatCurrency(bestDay.revenue) : "-"}
               </div>
               {bestDay && (
                 <p className="text-xs text-muted-foreground">
-                  {format(new Date(bestDay.date), 'dd MMM yyyy', { locale: fr })}
+                  {format(new Date(bestDay.result_date), "dd MMM yyyy", {
+                    locale: fr,
+                  })}
                 </p>
               )}
             </CardContent>
@@ -233,7 +271,11 @@ export default function History() {
                       {results.map((result) => (
                         <tr key={result.id} className="border-b last:border-0">
                           <td className="py-3 text-sm">
-                            {format(new Date(result.date), 'EEE dd MMM yyyy', { locale: fr })}
+                            {format(
+                              new Date(result.result_date),
+                              "EEE dd MMM yyyy",
+                              { locale: fr }
+                            )}
                           </td>
                           <td className="py-3 text-sm font-medium">
                             {formatCurrency(result.revenue)}
@@ -242,12 +284,17 @@ export default function History() {
                             {formatCurrency(result.profit)}
                           </td>
                           <td className="py-3 text-sm">
-                            {result.ad_budget ? formatCurrency(result.ad_budget) : '-'}
+                            {result.ad_budget
+                              ? formatCurrency(result.ad_budget)
+                              : "-"}
                           </td>
                           <td className="py-3 text-center">
                             {result.screenshot_url && (
                               <button
-                                onClick={() => setSelectedImage(result.screenshot_url)}
+                                onClick={() =>
+                                  // MODIFIÉ: On stocke le CHEMIN
+                                  setSelectedImage(result.screenshot_url)
+                                }
                                 className="text-primary hover:text-primary-hover"
                               >
                                 <Camera className="mx-auto h-5 w-5" />
@@ -255,7 +302,7 @@ export default function History() {
                             )}
                           </td>
                           <td className="py-3 text-center">
-                            {canModify(result.date) && (
+                            {canModify(result.result_date) && (
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -282,7 +329,9 @@ export default function History() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.max(1, p - 1))
+                        }
                         disabled={currentPage === 1}
                       >
                         Précédent
@@ -290,7 +339,9 @@ export default function History() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        onClick={() =>
+                          setCurrentPage((p) => Math.min(totalPages, p + 1))
+                        }
                         disabled={currentPage === totalPages}
                       >
                         Suivant
@@ -308,15 +359,30 @@ export default function History() {
         </Card>
       </div>
 
-      {/* Image Preview Dialog */}
-      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+      {/* MODIFIÉ: Tout le Dialog d'image a été mis à jour */}
+      <Dialog
+        open={!!selectedImage}
+        onOpenChange={() => setSelectedImage(null)}
+      >
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>Capture d'écran</DialogTitle>
           </DialogHeader>
-          {selectedImage && (
-            <img src={selectedImage} alt="Screenshot" className="w-full rounded-lg" />
-          )}
+          <div className="flex min-h-[300px] items-center justify-center">
+            {isSigningUrl && <Loader2 className="h-12 w-12 animate-spin" />}
+            {!isSigningUrl && signedUrl && (
+              <img
+                src={signedUrl}
+                alt="Screenshot"
+                className="w-full rounded-lg"
+              />
+            )}
+            {!isSigningUrl && !signedUrl && (
+              <p className="text-destructive">
+                Erreur lors du chargement de l'image.
+              </p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 

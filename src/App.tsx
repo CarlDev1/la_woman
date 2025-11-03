@@ -2,8 +2,9 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider, ProtectedRoute } from "@/hooks/useAuth";
+import { BrowserRouter, Routes, Route, useNavigate, useLocation } from "react-router-dom";
+import { AuthProvider, ProtectedRoute, useAuth } from "@/hooks/useAuth";
+import { useEffect } from "react";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -13,6 +14,7 @@ import NewEntry from "./pages/NewEntry";
 import History from "./pages/History";
 import Leaderboard from "./pages/Leaderboard";
 import Profile from "./pages/Profile";
+import Community from "./pages/Community";
 import Admin from "./pages/Admin";
 import AdminParticipants from "./pages/AdminParticipants";
 import AdminTrophies from "./pages/AdminTrophies";
@@ -22,6 +24,31 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
+// Component to handle automatic redirections based on user role
+const AutoRedirect = () => {
+  const { profile, loading } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!loading && profile) {
+      const currentPath = location.pathname;
+      
+      // If admin is on user routes, redirect to admin dashboard
+      if (profile.role === 'admin' && currentPath.startsWith('/dashboard') && currentPath !== '/admin/dashboard') {
+        navigate('/admin/dashboard', { replace: true });
+      }
+      
+      // If user is on admin routes, redirect to user dashboard
+      if (profile.role === 'user' && currentPath.startsWith('/admin')) {
+        navigate('/dashboard', { replace: true });
+      }
+    }
+  }, [profile, loading, navigate, location.pathname]);
+
+  return null;
+};
+
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <TooltipProvider>
@@ -29,6 +56,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+          <AutoRedirect />
           <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />

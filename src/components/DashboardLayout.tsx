@@ -27,6 +27,7 @@ const navItems = [
   { name: 'Nouvelle saisie', path: '/new-entry', icon: PlusCircle },
   { name: 'Historique', path: '/history', icon: ScrollText },
   { name: 'Classement', path: '/leaderboard', icon: Award },
+  { name: 'Communauté', path: '/community', icon: Users },
   { name: 'Mon profil', path: '/profile', icon: User },
 ];
 
@@ -76,7 +77,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
               </div>
             </div>
             <Avatar className="h-10 w-10 border-2 border-primary/20">
-              <AvatarImage src={profile?.avatar_url || ''} alt={profile?.full_name} />
+              <AvatarImage src={profile?.profile_photo_url || ''} alt={profile?.full_name} />
               <AvatarFallback className="bg-primary/10 text-primary">
                 {profile?.full_name?.charAt(0)}
               </AvatarFallback>

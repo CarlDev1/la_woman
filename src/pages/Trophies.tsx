@@ -1,24 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/lib/supabase';
+import { supabase, Trophy, UserTrophy } from '@/lib/supabase';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { subDays } from 'date-fns';
 
-type TrophyDefinition = {
-  id: string;
-  name: string;
-  description: string;
-  icon: string;
-  condition_type: string;
-  condition_value: number;
-  color: string;
-};
-
 type TrophyStatus = {
-  definition: TrophyDefinition;
+  trophy: Trophy;
   obtained: boolean;
   obtainedCount: number;
   lastObtainedDate?: string;
@@ -26,75 +16,10 @@ type TrophyStatus = {
   progress: number;
 };
 
-const trophyDefinitions: TrophyDefinition[] = [
-  {
-    id: 'monthly_best',
-    name: 'Reine du Mois',
-    description: 'Meilleur CA du mois précédent',
-    icon: '👑',
-    condition_type: 'monthly_best',
-    condition_value: 0,
-    color: '#FFD700',
-  },
-  {
-    id: 'bronze',
-    name: 'Bronze Business',
-    description: '10 millions de CA en 90 jours',
-    icon: '🥉',
-    condition_type: '90_days_revenue',
-    condition_value: 10000000,
-    color: '#CD7F32',
-  },
-  {
-    id: 'silver',
-    name: 'Argent Impératrice',
-    description: '30 millions de CA en 90 jours',
-    icon: '🥈',
-    condition_type: '90_days_revenue',
-    condition_value: 30000000,
-    color: '#C0C0C0',
-  },
-  {
-    id: 'gold',
-    name: 'Or Conquérante',
-    description: '50 millions de CA en 90 jours',
-    icon: '🥇',
-    condition_type: '90_days_revenue',
-    condition_value: 50000000,
-    color: '#FFD700',
-  },
-  {
-    id: 'star',
-    name: 'Étoile Montante',
-    description: '500K de bénéfice en 90 jours',
-    icon: '🌟',
-    condition_type: '90_days_profit',
-    condition_value: 500000,
-    color: '#FFC107',
-  },
-  {
-    id: 'diamond',
-    name: 'Diamant Précieux',
-    description: '1 million de bénéfice en 90 jours',
-    icon: '💎',
-    condition_type: '90_days_profit',
-    condition_value: 1000000,
-    color: '#00BCD4',
-  },
-  {
-    id: 'empress',
-    name: 'Impératrice des Profits',
-    description: '5 millions de bénéfice en 90 jours',
-    icon: '👸',
-    condition_type: '90_days_profit',
-    condition_value: 5000000,
-    color: '#9C27B0',
-  },
-];
 
 export default function Trophies() {
   const { user } = useAuth();
-  const [trophies, setTrophies] = useState<TrophyStatus[]>([]);
+  const [trophyStatuses, setTrophyStatuses] = useState<TrophyStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -109,12 +34,18 @@ export default function Trophies() {
     try {
       const date90DaysAgo = subDays(new Date(), 90);
 
+      // Fetch all trophies definitions
+      const { data: allTrophies } = await supabase
+        .from('trophies')
+        .select('*')
+        .order('threshold', { ascending: true });
+
       // Fetch results from last 90 days
       const { data: results90Days } = await supabase
         .from('daily_results')
         .select('revenue, profit')
         .eq('user_id', user.id)
-        .gte('date', date90DaysAgo.toISOString().split('T')[0]);
+        .gte('result_date', date90DaysAgo.toISOString().split('T')[0]);
 
       const revenueSum = results90Days?.reduce((sum, r) => sum + (r.revenue || 0), 0) || 0;
       const profitSum = results90Days?.reduce((sum, r) => sum + (r.profit || 0), 0) || 0;
@@ -122,40 +53,38 @@ export default function Trophies() {
       // Fetch obtained trophies
       const { data: userTrophies } = await supabase
         .from('user_trophies')
-        .select('trophy_id, obtained_at, value_achieved')
+        .select('trophy_id, earned_at, value_achieved')
         .eq('user_id', user.id);
 
-      const trophyStatuses: TrophyStatus[] = trophyDefinitions.map((def) => {
-        const obtainedTrophies = userTrophies?.filter((ut) => {
-          // Match by trophy name since we don't have IDs in the trophies table yet
-          return true; // We'll enhance this later
-        }) || [];
+      const statuses: TrophyStatus[] = (allTrophies || []).map((trophy) => {
+        const obtainedTrophies = userTrophies?.filter((ut) => ut.trophy_id === trophy.id) || [];
 
         let currentValue = 0;
         let progress = 0;
 
-        if (def.condition_type === '90_days_revenue') {
+        if (trophy.type === 'revenue_90d' && trophy.threshold) {
           currentValue = revenueSum;
-          progress = Math.min((currentValue / def.condition_value) * 100, 100);
-        } else if (def.condition_type === '90_days_profit') {
+          progress = Math.min((currentValue / trophy.threshold) * 100, 100);
+        } else if (trophy.type === 'profit_90d' && trophy.threshold) {
           currentValue = profitSum;
-          progress = Math.min((currentValue / def.condition_value) * 100, 100);
-        } else if (def.condition_type === 'monthly_best') {
-          // This would need special calculation
+          progress = Math.min((currentValue / trophy.threshold) * 100, 100);
+        } else if (trophy.type === 'monthly_queen') {
+          // Check if user is in monthly_queens table
           currentValue = 0;
-          progress = 0;
+          progress = obtainedTrophies.length > 0 ? 100 : 0;
         }
 
         return {
-          definition: def,
-          obtained: progress >= 100,
+          trophy,
+          obtained: obtainedTrophies.length > 0,
           obtainedCount: obtainedTrophies.length,
+          lastObtainedDate: obtainedTrophies[0]?.earned_at,
           currentValue,
           progress,
         };
       });
 
-      setTrophies(trophyStatuses);
+      setTrophyStatuses(statuses);
     } catch (error) {
       console.error('Error fetching trophies:', error);
     } finally {
@@ -167,8 +96,8 @@ export default function Trophies() {
     return value.toLocaleString('fr-FR') + ' FCFA';
   };
 
-  const obtainedCount = trophies.filter((t) => t.obtained).length;
-  const totalCount = trophies.length;
+  const obtainedCount = trophyStatuses.filter((t) => t.obtained).length;
+  const totalCount = trophyStatuses.length;
 
   if (loading) {
     return (
@@ -199,28 +128,28 @@ export default function Trophies() {
 
         {/* Trophies Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {trophies.map((trophy, index) => (
+          {trophyStatuses.map((status, index) => (
             <Card
-              key={trophy.definition.id}
+              key={status.trophy.id}
               className="animate-fade-in overflow-hidden hover-lift"
               style={{ animationDelay: `${index * 0.1}s` }}
             >
               <CardHeader className="text-center">
-                <div className="mb-4 text-6xl">{trophy.definition.icon}</div>
-                <CardTitle className="text-xl">{trophy.definition.name}</CardTitle>
+                <div className="mb-4 text-6xl">{status.trophy.emoji}</div>
+                <CardTitle className="text-xl">{status.trophy.name}</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {trophy.definition.description}
+                  {status.trophy.description}
                 </p>
               </CardHeader>
               <CardContent>
-                {trophy.obtained ? (
+                {status.obtained ? (
                   <div className="space-y-2 text-center">
-                    <Badge className="bg-success text-success-foreground">
+                    <Badge className="bg-green-500 text-white">
                       ✅ Obtenu
                     </Badge>
-                    {trophy.obtainedCount > 1 && (
+                    {status.obtainedCount > 1 && (
                       <p className="text-sm text-muted-foreground">
-                        Obtenu {trophy.obtainedCount} fois
+                        Obtenu {status.obtainedCount} fois
                       </p>
                     )}
                   </div>
@@ -229,27 +158,21 @@ export default function Trophies() {
                     <Badge variant="outline" className="w-full justify-center">
                       En cours
                     </Badge>
-                    {trophy.definition.condition_type !== 'monthly_best' && (
+                    {status.trophy.type !== 'monthly_queen' && status.trophy.threshold && (
                       <>
                         <div className="space-y-1">
-                          <div
-                            className="h-4 rounded-full transition-all duration-1000"
-                            style={{
-                              width: `${trophy.progress}%`,
-                              backgroundColor: trophy.definition.color,
-                            }}
-                          />
+                          <Progress value={status.progress} className="h-2" />
                         </div>
                         <p className="text-center text-sm">
-                          {formatCurrency(trophy.currentValue)} /{' '}
-                          {formatCurrency(trophy.definition.condition_value)}
+                          {formatCurrency(status.currentValue)} /{' '}
+                          {formatCurrency(status.trophy.threshold)}
                         </p>
                         <p className="text-center text-xs text-muted-foreground">
-                          {Math.round(trophy.progress)}%
+                          {Math.round(status.progress)}%
                         </p>
                       </>
                     )}
-                    {trophy.definition.condition_type === 'monthly_best' && (
+                    {status.trophy.type === 'monthly_queen' && (
                       <p className="text-center text-sm text-muted-foreground">
                         Soyez la meilleure du mois prochain !
                       </p>

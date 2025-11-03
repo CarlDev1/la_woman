@@ -20,22 +20,57 @@ const Login = () => {
     setLoading(true);
 
     try {
+      console.log('🔐 Tentative de connexion avec:', email);
+      
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('❌ Erreur auth:', error);
+        throw error;
+      }
+
+      console.log('✅ Auth réussie, user ID:', data.user?.id);
 
       if (data.user) {
         // Fetch profile to check status
+        console.log('📋 Récupération du profil...');
+        
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
           .select('*')
           .eq('id', data.user.id)
           .single();
 
-        if (profileError) throw profileError;
+        console.log('📊 Profil récupéré:', profile);
+        console.log('⚠️ Erreur profil:', profileError);
+
+        if (profileError) {
+          console.error('❌ Erreur lors de la récupération du profil:', profileError);
+          
+          // Si le profil n'existe pas, le créer
+          if (profileError.code === 'PGRST116') {
+            toast.error('Profil introuvable. Veuillez contacter l\'administrateur.');
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+          
+          throw profileError;
+        }
+
+        if (!profile) {
+          toast.error('Profil introuvable. Veuillez contacter l\'administrateur.');
+          await supabase.auth.signOut();
+          setLoading(false);
+          return;
+        }
+
+        console.log('👤 Profil:', profile);
+        console.log('🔒 Statut:', profile.status);
+        console.log('👑 Rôle:', profile.role);
 
         if (profile.status === 'pending') {
           await supabase.auth.signOut();
@@ -51,12 +86,23 @@ const Login = () => {
           return;
         }
 
-        // Active account - redirect to dashboard
-        // Role-based routing will be handled by the app based on user_roles table
-        toast.success('Connexion réussie !');
-        navigate('/dashboard');
+        // Active account - redirect based on role
+        if (profile.role === 'admin') {
+          console.log('✅ Redirection vers admin dashboard');
+          toast.success(`Bienvenue ${profile.full_name} 👑`);
+          navigate('/admin/dashboard');
+        } else if (profile.role === 'user' && profile.status === 'active') {
+          console.log('✅ Redirection vers user dashboard');
+          toast.success(`Bienvenue ${profile.full_name} 👋`);
+          navigate('/dashboard');
+        } else {
+          console.error('❌ Combinaison role/status invalide:', profile);
+          toast.error('Accès non autorisé');
+          await supabase.auth.signOut();
+        }
       }
     } catch (error: any) {
+      console.error('❌ Erreur générale:', error);
       toast.error(error.message || 'Email ou mot de passe incorrect');
     } finally {
       setLoading(false);
