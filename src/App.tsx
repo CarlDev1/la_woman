@@ -26,6 +26,8 @@ import PendingApproval from "./pages/PendingApproval";
 import Profile from "./pages/Profile";
 import Register from "./pages/Register";
 import Trophies from "./pages/Trophies";
+import AdminDashboard from "./pages/admin/Dashboard";
+import PendingRegistrations from "./pages/admin/PendingRegistrations";
 
 const queryClient = new QueryClient();
 
@@ -85,6 +87,11 @@ const App = () => (
             <Route path="/admin" element={<Admin />} />
             <Route path="/admin/participants" element={<AdminParticipants />} />
             <Route path="/admin/trophies" element={<AdminTrophies />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/pending" element={<PendingRegistrations />} />
+            <Route path="/admin/community" element={<Community />} />
+
+
 
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
