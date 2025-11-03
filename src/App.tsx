@@ -1,7 +1,7 @@
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "@/hooks/useAuth";
+import { AuthProvider, ProtectedRoute, useAuth } from "@/hooks/useAuth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect } from "react";
 import {
@@ -28,6 +28,12 @@ import Register from "./pages/Register";
 import Trophies from "./pages/Trophies";
 import AdminDashboard from "./pages/admin/Dashboard";
 import PendingRegistrations from "./pages/admin/PendingRegistrations";
+import CreateProfile from "./pages/CreateProfile";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import AdminRoute from "./components/admin/AdminRoute";
+import AdminCommunity from "./pages/admin/Community";
+import AdminProfile from "./pages/admin/Profile";
 
 const queryClient = new QueryClient();
 
@@ -72,27 +78,36 @@ const App = () => (
             <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
-            <Route path="/pending-approval" element={<PendingApproval />} />
-
-            {/* User Routes - Accessible sans connexion */}
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/community" element={<Community />} />
-            <Route path="/trophies" element={<Trophies />} />
-            <Route path="/new-entry" element={<NewEntry />} />
-            <Route path="/history" element={<History />} />
-            <Route path="/leaderboard" element={<Leaderboard />} />
-            <Route path="/profile" element={<Profile />} />
-
-            {/* Admin Routes - Accessible sans connexion */}
-            <Route path="/admin" element={<Admin />} />
-            <Route path="/admin/participants" element={<AdminParticipants />} />
-            <Route path="/admin/trophies" element={<AdminTrophies />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            <Route path="/admin/pending" element={<PendingRegistrations />} />
-            <Route path="/admin/community" element={<Community />} />
-
-
-
+            <Route path="/creer-profil" element={<CreateProfile />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
+            
+            {/* Protected User Routes */}
+            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+            <Route path="/trophies" element={<ProtectedRoute><Trophies /></ProtectedRoute>} />
+            <Route path="/new-entry" element={<ProtectedRoute><NewEntry /></ProtectedRoute>} />
+            <Route path="/history" element={<ProtectedRoute><History /></ProtectedRoute>} />
+            <Route path="/leaderboard" element={<ProtectedRoute><Leaderboard /></ProtectedRoute>} />
+            <Route path="/profile" element={
+              <ProtectedRoute requireStatus="active">
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/community" element={
+              <ProtectedRoute requireStatus="active">
+                <Community />
+              </ProtectedRoute>
+            } />
+            
+            {/* Admin Routes */}
+            <Route path="/admin" element={<ProtectedRoute><Admin /></ProtectedRoute>} />
+            <Route path="/admin/dashboard" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+            <Route path="/admin/pending" element={<AdminRoute><PendingRegistrations /></AdminRoute>} />
+            <Route path="/admin/participants" element={<AdminRoute><AdminParticipants /></AdminRoute>} />
+            <Route path="/admin/trophies" element={<AdminRoute><AdminTrophies /></AdminRoute>} />
+            <Route path="/admin/community" element={<AdminRoute><AdminCommunity /></AdminRoute>} />
+            <Route path="/admin/profile" element={<AdminRoute><AdminProfile /></AdminRoute>} />
+            
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
