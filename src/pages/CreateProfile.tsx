@@ -15,6 +15,7 @@ import { Loader2, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
+import { sendNewRegistrationEmail } from "@/lib/email-service";
 
 const CreateProfile = () => {
   const navigate = useNavigate();
@@ -151,6 +152,16 @@ const CreateProfile = () => {
       });
 
       if (profileError) throw profileError;
+
+      // Envoyer email à l'admin
+      try {
+        const ADMIN_EMAIL = 'carlosdjanato1@gmail.com' // Email de l'administrateur
+        await sendNewRegistrationEmail(ADMIN_EMAIL, userFullName, userEmail, phone)
+        console.log('✅ Email admin envoyé')
+      } catch (emailError) {
+        console.error('⚠️ Erreur email admin:', emailError)
+        // Continue même si l'email échoue
+      }
 
       toast.success(
         "Profil complété ! Votre inscription a été envoyée pour validation."
