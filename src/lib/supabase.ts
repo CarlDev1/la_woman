@@ -85,3 +85,11 @@ export type Email = {
   body: string;
   created_at: string;
 };
+
+export type AdminEmail = {
+  id: string;
+  email: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};

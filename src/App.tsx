@@ -25,6 +25,7 @@ import AdminTrophies from "./pages/admin/Trophies";
 import AdminParticipants from "./pages/admin/Participants";
 import AdminProfile from "./pages/admin/Profile";
 import AdminCommunity from './pages/admin/Community';
+import AdminEmails from './pages/admin/AdminEmails';
 import AdminRoute from "./components/admin/AdminRoute";
 import NotFound from "./pages/NotFound";
 
@@ -96,6 +97,7 @@ const App = () => (
             <Route path="/admin/trophies" element={<AdminRoute><AdminTrophies /></AdminRoute>} />
             <Route path="/admin/community" element={<AdminRoute><AdminCommunity /></AdminRoute>} />
             <Route path="/admin/profile" element={<AdminRoute><AdminProfile /></AdminRoute>} />
+            <Route path="/admin/emails" element={<AdminRoute><AdminEmails /></AdminRoute>} />
             
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

@@ -10,7 +10,8 @@ import {
   Menu, 
   LogOut,
   Crown,
-  MessageSquare
+  MessageSquare,
+  Mail
 } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabase';
@@ -68,6 +69,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       href: '/admin/community',
       icon: MessageSquare,
       current: location.pathname === '/admin/community'
+    },
+    {
+      name: 'Emails admin',
+      href: '/admin/emails',
+      icon: Mail,
+      current: location.pathname === '/admin/emails'
     }
   ];
 
