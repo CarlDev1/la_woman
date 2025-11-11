@@ -29,8 +29,10 @@ import { Post } from "@/hooks/usePosts";
 interface PostCardProps {
   post: Post;
   currentUserId: string;
+  isCurrentUserAdmin?: boolean; // Nouveau prop pour vérifier si l'utilisateur actuel est admin
   onToggleLike: (postId: string) => void;
-  onUpdate: (postId: string, content: string, imageFile?: File) => void;
+  onUpdate?: (postId: string, content: string, imageFile?: File) => void;
+  onEdit?: (post: Post) => void; // Alternative pour l'édition via modal externe
   onDelete: (postId: string) => void;
   onCommentAdded: (postId: string) => void;
   onCommentDeleted: (postId: string) => void;
@@ -39,8 +41,10 @@ interface PostCardProps {
 const PostCard = ({ 
   post, 
   currentUserId, 
+  isCurrentUserAdmin = false,
   onToggleLike, 
   onUpdate,
+  onEdit,
   onDelete,
   onCommentAdded,
   onCommentDeleted
@@ -52,6 +56,10 @@ const PostCard = ({
   const [showImageModal, setShowImageModal] = useState(false);
   
   const isOwnPost = post.author.id === currentUserId;
+  // Admin peut supprimer tous les posts, utilisateur lambda seulement ses propres posts
+  const canDelete = isCurrentUserAdmin || isOwnPost;
+  // Utilisateur lambda peut seulement modifier ses propres posts, admin peut modifier tous les posts
+  const canEdit = isCurrentUserAdmin || isOwnPost;
   const needsExpansion = post.content.length > 200;
   const displayContent = needsExpansion && !isExpanded 
     ? post.content.slice(0, 200) + "..." 
@@ -110,7 +118,7 @@ const PostCard = ({
               </div>
             </div>
             
-            {isOwnPost && (
+            {(canEdit || canDelete) && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon">
@@ -118,17 +126,27 @@ const PostCard = ({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowEditModal(true)}>
-                    <Edit className="w-4 h-4 mr-2" />
-                    Modifier
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-destructive"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Supprimer
-                  </DropdownMenuItem>
+                  {canEdit && (
+                    <DropdownMenuItem onClick={() => {
+                      if (onEdit) {
+                        onEdit(post);
+                      } else if (onUpdate) {
+                        setShowEditModal(true);
+                      }
+                    }}>
+                      <Edit className="w-4 h-4 mr-2" />
+                      {isCurrentUserAdmin && !isOwnPost ? "Modifier (Admin)" : "Modifier"}
+                    </DropdownMenuItem>
+                  )}
+                  {canDelete && (
+                    <DropdownMenuItem
+                      className="text-destructive"
+                      onClick={() => setShowDeleteDialog(true)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      {isCurrentUserAdmin && !isOwnPost ? "Supprimer (Admin)" : "Supprimer"}
+                    </DropdownMenuItem>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
@@ -210,9 +228,15 @@ const PostCard = ({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Supprimer ce post ?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {isCurrentUserAdmin && !isOwnPost 
+                ? "Supprimer ce post (Action Admin) ?" 
+                : "Supprimer ce post ?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              Cette action est irréversible. Le post sera définitivement supprimé.
+              {isCurrentUserAdmin && !isOwnPost 
+                ? "Vous êtes sur le point de supprimer le post d'un autre utilisateur en tant qu'administrateur. Cette action est irréversible."
+                : "Cette action est irréversible. Le post sera définitivement supprimé."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -224,13 +248,15 @@ const PostCard = ({
         </AlertDialogContent>
       </AlertDialog>
 
-      <EditPostModal
-        open={showEditModal}
-        onOpenChange={setShowEditModal}
-        onSubmit={(content, imageFile) => onUpdate(post.id, content, imageFile)}
-        initialContent={post.content}
-        initialImageUrl={post.imageUrl}
-      />
+      {onUpdate && (
+        <EditPostModal
+          open={showEditModal}
+          onOpenChange={setShowEditModal}
+          onSubmit={(content, imageFile) => onUpdate(post.id, content, imageFile)}
+          initialContent={post.content}
+          initialImageUrl={post.imageUrl}
+        />
+      )}
 
       {post.imageUrl && (
         <ImageModal

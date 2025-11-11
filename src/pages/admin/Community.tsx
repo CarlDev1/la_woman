@@ -1,10 +1,13 @@
-import AdminLayout from '@/components/admin/AdminLayout';
-import CommunityContent from '@/components/community/CommunityContent';
+import AdminLayout from "@/components/admin/AdminLayout";
+import CommunityFeed from "@/components/community/CommunityFeed";
 
 export default function AdminCommunity() {
   return (
     <AdminLayout>
-      <CommunityContent />
+      <CommunityFeed
+        title="Communauté - Administration"
+        showFloatingButton={true}
+      />
     </AdminLayout>
   );
 }

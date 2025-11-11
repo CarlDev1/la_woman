@@ -95,7 +95,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
       <div className="flex">
         {/* Desktop Sidebar */}
-        <aside className="hidden h-[calc(100vh-4rem)] w-64 border-r border-border bg-white md:block">
+        <aside className="hidden fixed top-16 left-0 z-30 h-[calc(100vh-4rem)] w-64 border-r border-border bg-white overflow-y-auto md:block">
           <nav className="space-y-1 p-4">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -162,7 +162,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
         </aside>
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto pb-20 md:pb-8">
+        <main className="flex-1 overflow-y-auto pb-20 md:pb-8 md:ml-64">
           <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
             {children}
           </div>

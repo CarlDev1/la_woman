@@ -1,88 +1,102 @@
-import { supabase } from './supabase'
+const APP_URL = window.location.origin;
 
-const APP_URL = window.location.origin
-
-export const sendWelcomeEmail = async (email: string, name: string, confirmationUrl: string) => {
-  const { data, error } = await supabase.functions.invoke('send-email', {
-    body: {
-      to: email,
-      subject: '🎉 Bienvenue sur LA WOMAN - Confirmez votre email',
-      type: 'welcome_confirmation',
-      data: {
-        name,
-        confirmationUrl
+// Helper pour appeler la fonction Edge sans session
+const invokeEmailFunction = async (
+  type: string,
+  to: string,
+  subject: string,
+  data: Record<string, unknown>
+) => {
+  try {
+    // Utiliser la clé API Supabase directement (pas besoin de session)
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-email`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${
+            import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+          }`,
+        },
+        body: JSON.stringify({
+          to,
+          subject,
+          type,
+          data,
+        }),
       }
+    );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(
+        `Email function error: ${errorData.error || response.statusText}`
+      );
     }
-  })
 
-  if (error) {
-    console.error('Error sending welcome email:', error)
-    throw error
+    const result = await response.json();
+    return result;
+  } catch (error) {
+    console.error(`❌ Email (${type}) error:`, error);
+    throw error;
   }
+};
 
-  return data
-}
-
-export const sendNewRegistrationEmail = async (adminEmail: string, userName: string, userEmail: string, userPhone: string) => {
-  const { data, error } = await supabase.functions.invoke('send-email', {
-    body: {
-      to: adminEmail,
-      subject: '📝 Nouvelle inscription en attente - LA WOMAN',
-      type: 'new_registration',
-      data: {
-        name: userName,
-        email: userEmail,
-        phone: userPhone,
-        adminUrl: `${APP_URL}/admin/pending`
-      }
+export const sendWelcomeEmail = async (
+  email: string,
+  name: string,
+  confirmationUrl: string
+) => {
+  return invokeEmailFunction(
+    "welcome_confirmation",
+    email,
+    "🎉 Bienvenue sur LA WOMAN - Confirmez votre email",
+    {
+      name,
+      confirmationUrl,
     }
-  })
+  );
+};
 
-  if (error) {
-    console.error('Error sending admin notification:', error)
-    throw error
-  }
-
-  return data
-}
+export const sendNewRegistrationEmail = async (
+  adminEmail: string,
+  userName: string,
+  userEmail: string,
+  userPhone: string
+) => {
+  return invokeEmailFunction(
+    "new_registration",
+    adminEmail,
+    "📝 Nouvelle inscription en attente - LA WOMAN",
+    {
+      name: userName,
+      email: userEmail,
+      phone: userPhone,
+      adminUrl: `${APP_URL}/admin/pending`,
+    }
+  );
+};
 
 export const sendValidationEmail = async (email: string, name: string) => {
-  const { data, error } = await supabase.functions.invoke('send-email', {
-    body: {
-      to: email,
-      subject: '🎉 Votre compte LA WOMAN est activé !',
-      type: 'account_approved',
-      data: {
-        name,
-        loginUrl: `${APP_URL}/login`
-      }
+  return invokeEmailFunction(
+    "account_approved",
+    email,
+    "🎉 Votre compte LA WOMAN est activé !",
+    {
+      name,
+      loginUrl: `${APP_URL}/login`,
     }
-  })
-
-  if (error) {
-    console.error('Error sending validation email:', error)
-    throw error
-  }
-
-  return data
-}
+  );
+};
 
 export const sendRejectionEmail = async (email: string, name: string) => {
-  const { data, error} = await supabase.functions.invoke('send-email', {
-    body: {
-      to: email,
-      subject: 'Inscription LA WOMAN',
-      type: 'account_rejected',
-      data: {
-        name
-      }
+  return invokeEmailFunction(
+    "account_rejected",
+    email,
+    "Inscription LA WOMAN",
+    {
+      name,
     }
-  })
-
-  if (error) {
-    console.error('Error sending rejection email:', error)
-    throw error
-  }
-
-  return data
-}
+  );
+};

@@ -9,6 +9,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { supabase } from "@/lib/supabase";
+import { sendWelcomeEmail } from "@/lib/email-service";
 import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -46,12 +47,11 @@ const Register = () => {
     setLoading(true);
 
     try {
-      // 1. Create auth user
-      const { error: authError } = await supabase.auth.signUp({
+      // 1. Create auth user (sans email automatique de Supabase)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          // C'EST LA LIGNE CLÉ !
           // Redirige vers /creer-profil APRÈS clic sur le lien de confirmation
           emailRedirectTo: `${window.location.origin}/creer-profil`,
           data: {
@@ -61,6 +61,17 @@ const Register = () => {
       });
 
       if (authError) throw authError;
+
+      // 2. Envoyer l'email personnalisé de bienvenue
+      // Le lien de confirmation sera généré par Supabase et inclus dans l'email
+      try {
+        const confirmationUrl = `${window.location.origin}/creer-profil`;
+        await sendWelcomeEmail(email, fullName, confirmationUrl);
+        console.log('✅ Email personnalisé envoyé');
+      } catch (emailError) {
+        console.error('⚠ Erreur envoi email personnalisé:', emailError);
+        // On continue même si l'email échoue, l'utilisateur peut toujours utiliser l'email de Supabase
+      }
 
       toast.success(
         "Inscription réussie ! Veuillez consulter vos emails pour valider votre compte.",

@@ -9,13 +9,16 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  sendNewRegistrationEmail,
+  sendWelcomeEmail,
+} from "@/lib/email-service";
 import { supabase } from "@/lib/supabase";
 import { User } from "@supabase/supabase-js";
 import { Loader2, Upload, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { sendNewRegistrationEmail } from "@/lib/email-service";
 
 const CreateProfile = () => {
   const navigate = useNavigate();
@@ -153,24 +156,56 @@ const CreateProfile = () => {
 
       if (profileError) throw profileError;
 
-      // Envoyer email à l'admin
+      let emailsSent = 0;
+      const emailErrors: string[] = [];
+
+      // 1️⃣ Email à l'utilisateur (confirmation d'inscription)
       try {
-        const ADMIN_EMAIL = 'carlosdjanato1@gmail.com' // Email de l'administrateur
-        await sendNewRegistrationEmail(ADMIN_EMAIL, userFullName, userEmail, phone)
-        console.log('✅ Email admin envoyé')
-      } catch (emailError) {
-        console.error('⚠️ Erreur email admin:', emailError)
-        // Continue même si l'email échoue
+        const confirmationUrl = `${window.location.origin}/profile/pending`;
+        await sendWelcomeEmail(userEmail, userFullName, confirmationUrl);
+        emailsSent++;
+      } catch (error) {
+        console.error("❌ Welcome email error:", error);
+        emailErrors.push("utilisateur");
       }
 
-      toast.success(
-        "Profil complété ! Votre inscription a été envoyée pour validation."
-      );
+      // 2️⃣ Email à l'admin (notification nouvelle inscription)
+      try {
+        const ADMIN_EMAIL = "carlosdjanato1@gmail.com";
+
+        await sendNewRegistrationEmail(
+          ADMIN_EMAIL,
+          userFullName,
+          userEmail,
+          phone
+        );
+        emailsSent++;
+      } catch (error) {
+        emailErrors.push("admin");
+      }
+
+      // Afficher les résultats
+      if (emailsSent === 2) {
+        toast.success(
+          "Profil complété ! Vérifiez votre email pour confirmer votre inscription."
+        );
+      } else if (emailsSent === 1) {
+        toast.success(
+          "Profil complété ! ⚠ Un des emails n'a pas pu être envoyé."
+        );
+      } else {
+        toast.warning(
+          "Profil créé mais les emails n'ont pas pu être envoyés. Contactez l'admin."
+        );
+      }
+
       navigate("/login");
     } catch (error) {
       console.error("Profile creation error:", error);
       toast.error(
-        error.message || "Une erreur est survenue lors de la création du profil"
+        error instanceof Error
+          ? error.message
+          : "Une erreur est survenue lors de la création du profil"
       );
     } finally {
       setIsSubmitting(false);
