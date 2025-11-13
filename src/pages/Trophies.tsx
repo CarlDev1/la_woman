@@ -1,109 +1,45 @@
-import { useEffect, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase, Trophy, UserTrophy } from '@/lib/supabase';
+import { useTrophies } from '@/hooks/useTrophies';
 import DashboardLayout from '@/components/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { subDays } from 'date-fns';
-
-type TrophyStatus = {
-  trophy: Trophy;
-  obtained: boolean;
-  obtainedCount: number;
-  lastObtainedDate?: string;
-  currentValue: number;
-  progress: number;
-};
-
+import { Loader2 } from 'lucide-react';
 
 export default function Trophies() {
   const { user } = useAuth();
-  const [trophyStatuses, setTrophyStatuses] = useState<TrophyStatus[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (user) {
-      fetchTrophies();
-    }
-  }, [user]);
-
-  const fetchTrophies = async () => {
-    if (!user) return;
-
-    try {
-      const date90DaysAgo = subDays(new Date(), 90);
-
-      // Fetch all trophies definitions
-      const { data: allTrophies } = await supabase
-        .from('trophies')
-        .select('*')
-        .order('threshold', { ascending: true });
-
-      // Fetch results from last 90 days
-      const { data: results90Days } = await supabase
-        .from('daily_results')
-        .select('revenue, profit')
-        .eq('user_id', user.id)
-        .gte('result_date', date90DaysAgo.toISOString().split('T')[0]);
-
-      const revenueSum = results90Days?.reduce((sum, r) => sum + (r.revenue || 0), 0) || 0;
-      const profitSum = results90Days?.reduce((sum, r) => sum + (r.profit || 0), 0) || 0;
-
-      // Fetch obtained trophies
-      const { data: userTrophies } = await supabase
-        .from('user_trophies')
-        .select('trophy_id, earned_at, value_achieved')
-        .eq('user_id', user.id);
-
-      const statuses: TrophyStatus[] = (allTrophies || []).map((trophy) => {
-        const obtainedTrophies = userTrophies?.filter((ut) => ut.trophy_id === trophy.id) || [];
-
-        let currentValue = 0;
-        let progress = 0;
-
-        if (trophy.type === 'revenue_90d' && trophy.threshold) {
-          currentValue = revenueSum;
-          progress = Math.min((currentValue / trophy.threshold) * 100, 100);
-        } else if (trophy.type === 'profit_90d' && trophy.threshold) {
-          currentValue = profitSum;
-          progress = Math.min((currentValue / trophy.threshold) * 100, 100);
-        } else if (trophy.type === 'monthly_queen') {
-          // Check if user is in monthly_queens table
-          currentValue = 0;
-          progress = obtainedTrophies.length > 0 ? 100 : 0;
-        }
-
-        return {
-          trophy,
-          obtained: obtainedTrophies.length > 0,
-          obtainedCount: obtainedTrophies.length,
-          lastObtainedDate: obtainedTrophies[0]?.earned_at,
-          currentValue,
-          progress,
-        };
-      });
-
-      setTrophyStatuses(statuses);
-    } catch (error) {
-      console.error('Error fetching trophies:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const { trophyProgresses, loading, error } = useTrophies(user?.id);
 
   const formatCurrency = (value: number) => {
     return value.toLocaleString('fr-FR') + ' FCFA';
   };
 
-  const obtainedCount = trophyStatuses.filter((t) => t.obtained).length;
-  const totalCount = trophyStatuses.length;
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    });
+  };
+
+  const obtainedCount = trophyProgresses.filter(t => t.obtained).length;
+  const totalCount = trophyProgresses.length;
 
   if (loading) {
     return (
       <DashboardLayout>
         <div className="flex items-center justify-center py-20">
-          <div className="h-12 w-12 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+          <Loader2 className="h-12 w-12 animate-spin text-pink-500" />
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <DashboardLayout>
+        <div className="text-center py-20">
+          <p className="text-red-600">{error}</p>
         </div>
       </DashboardLayout>
     );
@@ -114,7 +50,7 @@ export default function Trophies() {
       <div className="space-y-8">
         {/* Header */}
         <div className="text-center">
-          <h1 className="mb-2 text-3xl font-bold">🏆 Mes Trophées</h1>
+          <h1 className="mb-2 text-3xl font-bold gradient-text">🏆 Mes Trophées</h1>
           <p className="text-lg text-muted-foreground">
             {obtainedCount} trophée{obtainedCount > 1 ? 's' : ''} obtenu{obtainedCount > 1 ? 's' : ''} sur {totalCount}
           </p>
@@ -128,14 +64,17 @@ export default function Trophies() {
 
         {/* Trophies Grid */}
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {trophyStatuses.map((status, index) => (
+          {trophyProgresses.map((status, index) => (
             <Card
               key={status.trophy.id}
               className="animate-fade-in overflow-hidden hover-lift"
-              style={{ animationDelay: `${index * 0.1}s` }}
+              style={{
+                animationDelay: `${index * 0.1}s`,
+                borderColor: status.obtained ? status.trophy.color : undefined
+              }}
             >
               <CardHeader className="text-center">
-                <div className="mb-4 text-6xl">{status.trophy.emoji}</div>
+                <div className="mb-4 text-6xl">{status.trophy.icon}</div>
                 <CardTitle className="text-xl">{status.trophy.name}</CardTitle>
                 <p className="text-sm text-muted-foreground">
                   {status.trophy.description}
@@ -147,9 +86,14 @@ export default function Trophies() {
                     <Badge className="bg-green-500 text-white">
                       ✅ Obtenu
                     </Badge>
-                    {status.obtainedCount > 1 && (
-                      <p className="text-sm text-muted-foreground">
-                        Obtenu {status.obtainedCount} fois
+                    {status.lastObtainedDate && (
+                      <p className="text-xs text-muted-foreground">
+                        Le {formatDate(status.lastObtainedDate)}
+                      </p>
+                    )}
+                    {status.currentValue > 0 && (
+                      <p className="text-sm font-medium text-green-600">
+                        {formatCurrency(status.currentValue)}
                       </p>
                     )}
                   </div>
@@ -158,24 +102,44 @@ export default function Trophies() {
                     <Badge variant="outline" className="w-full justify-center">
                       En cours
                     </Badge>
-                    {status.trophy.type !== 'monthly_queen' && status.trophy.threshold && (
+                    
+                    {/* Trophées CA */}
+                    {status.trophy.condition_type === 'revenue_total' && (
                       <>
                         <div className="space-y-1">
                           <Progress value={status.progress} className="h-2" />
                         </div>
                         <p className="text-center text-sm">
-                          {formatCurrency(status.currentValue)} /{' '}
-                          {formatCurrency(status.trophy.threshold)}
+                          {formatCurrency(status.currentValue)} / {formatCurrency(status.trophy.condition_value)}
                         </p>
                         <p className="text-center text-xs text-muted-foreground">
-                          {Math.round(status.progress)}%
+                          {Math.round(status.progress)}% - Plus que {formatCurrency(status.trophy.condition_value - status.currentValue)}
                         </p>
                       </>
                     )}
-                    {status.trophy.type === 'monthly_queen' && (
-                      <p className="text-center text-sm text-muted-foreground">
-                        Soyez la meilleure du mois prochain !
-                      </p>
+
+                    {/* Reine du Mois */}
+                    {status.trophy.condition_type === 'monthly_best_profit' && (
+                      <div className="text-center">
+                        <p className="text-sm font-medium">
+                          Bénéfice ce mois : {formatCurrency(status.currentValue)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Soyez la meilleure du mois !
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Championne 2025 */}
+                    {status.trophy.condition_type === 'annual_2025' && (
+                      <div className="text-center">
+                        <p className="text-sm font-medium">
+                          Bénéfice 2025 : {formatCurrency(status.currentValue)}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Soyez la meilleure de 2025 !
+                        </p>
+                      </div>
                     )}
                   </div>
                 )}

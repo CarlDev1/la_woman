@@ -4,16 +4,6 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -25,19 +15,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Trophy, 
   Users, 
-  Settings, 
   Award, 
   Loader2, 
-  Plus,
   Play,
   UserCheck,
-  Calendar
+  Calendar,
+  TrendingUp
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { subDays, format } from 'date-fns';
+import { format, subDays } from 'date-fns';
 import { fr } from 'date-fns/locale';
 
-type TrophyDefinition = {
+interface ParticipantStats {
+  id: string;
+  full_name: string;
+  email: string;
+  profile_photo_url: string | null;
+  total_revenue: number;
+  trophy_count: number;
+  last_trophy_date: string | null;
+  eligible_trophies: string[];
+}
+
+interface TrophyAward {
+  id: string;
+  user_id: string;
+  trophy_id: string;
+  awarded_at: string;
+  value_achieved: number;
+  full_name: string;
+  trophy_name: string;
+  trophy_icon: string;
+}
+
+interface Trophy {
   id: string;
   name: string;
   description: string;
@@ -46,113 +57,31 @@ type TrophyDefinition = {
   condition_value: number;
   color: string;
   auto_award: boolean;
-};
+}
 
-type ParticipantTrophy = {
+interface ParticipantTrophy {
   id: string;
   full_name: string;
   email: string;
   profile_photo_url: string | null;
+  revenue_90d: number;
+  profit_90d: number;
   trophy_count: number;
   last_trophy_date: string | null;
-  current_90d_revenue: number;
-  current_90d_profit: number;
   eligible_trophies: string[];
-};
-
-type TrophyAward = {
-  id: string;
-  user_id: string;
-  trophy_id: string;
-  awarded_at: string;
-  awarded_by: string;
-  value_achieved: number;
-  full_name: string;
-  trophy_name: string;
-  trophy_icon: string;
-};
-
-const trophyDefinitions: TrophyDefinition[] = [
-  {
-    id: 'monthly_best',
-    name: 'Reine du Mois',
-    description: 'Meilleur CA du mois précédent',
-    icon: '👑',
-    condition_type: 'monthly_best',
-    condition_value: 0,
-    color: '#FFD700',
-    auto_award: true,
-  },
-  {
-    id: 'bronze',
-    name: 'Bronze Business',
-    description: '10 millions de CA en 90 jours',
-    icon: '🥉',
-    condition_type: '90_days_revenue',
-    condition_value: 10000000,
-    color: '#CD7F32',
-    auto_award: true,
-  },
-  {
-    id: 'silver',
-    name: 'Argent Impératrice',
-    description: '30 millions de CA en 90 jours',
-    icon: '🥈',
-    condition_type: '90_days_revenue',
-    condition_value: 30000000,
-    color: '#C0C0C0',
-    auto_award: true,
-  },
-  {
-    id: 'gold',
-    name: 'Or Conquérante',
-    description: '50 millions de CA en 90 jours',
-    icon: '🥇',
-    condition_type: '90_days_revenue',
-    condition_value: 50000000,
-    color: '#FFD700',
-    auto_award: true,
-  },
-  {
-    id: 'star',
-    name: 'Étoile Montante',
-    description: '500K de bénéfice en 90 jours',
-    icon: '🌟',
-    condition_type: '90_days_profit',
-    condition_value: 500000,
-    color: '#FFC107',
-    auto_award: true,
-  },
-  {
-    id: 'diamond',
-    name: 'Diamant Précieux',
-    description: '1 million de bénéfice en 90 jours',
-    icon: '💎',
-    condition_type: '90_days_profit',
-    condition_value: 1000000,
-    color: '#00BCD4',
-    auto_award: true,
-  },
-  {
-    id: 'empress',
-    name: 'Impératrice des Profits',
-    description: '5 millions de bénéfice en 90 jours',
-    icon: '👸',
-    condition_type: '90_days_profit',
-    condition_value: 5000000,
-    color: '#9C27B0',
-    auto_award: true,
-  },
-];
+}
 
 export default function AdminTrophies() {
   const [participants, setParticipants] = useState<ParticipantTrophy[]>([]);
   const [recentAwards, setRecentAwards] = useState<TrophyAward[]>([]);
+  const [trophies, setTrophies] = useState<Trophy[]>([]);
   const [loading, setLoading] = useState(true);
   const [processingAuto, setProcessingAuto] = useState(false);
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [selectedTrophy, setSelectedTrophy] = useState<string>('');
   const [manualValue, setManualValue] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('participants');
+  const [eligibleCount, setEligibleCount] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -162,6 +91,7 @@ export default function AdminTrophies() {
     try {
       setLoading(true);
       await Promise.all([
+        fetchTrophies(),
         fetchParticipants(),
         fetchRecentAwards()
       ]);
@@ -173,10 +103,22 @@ export default function AdminTrophies() {
     }
   };
 
+  const fetchTrophies = async () => {
+    const { data, error } = await supabase
+      .from('trophies')
+      .select('*')
+      .order('condition_value', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching trophies:', error);
+      return;
+    }
+    setTrophies(data || []);
+  };
+
   const fetchParticipants = async () => {
     const date90DaysAgo = subDays(new Date(), 90);
 
-    // Fetch participants with their 90-day stats
     const { data: participants, error } = await supabase
       .from('profiles')
       .select(`
@@ -196,56 +138,40 @@ export default function AdminTrophies() {
       return;
     }
 
-    const processedParticipants: ParticipantTrophy[] = participants?.map(participant => {
+    const processedParticipants: ParticipantTrophy[] = (participants || []).map(participant => {
       const revenue90d = participant.daily_results?.reduce((sum: number, r: any) => sum + (r.revenue || 0), 0) || 0;
       const profit90d = participant.daily_results?.reduce((sum: number, r: any) => sum + (r.profit || 0), 0) || 0;
       
-      const trophyCount = participant.user_trophies?.length || 0;
-      const lastTrophyDate = participant.user_trophies?.length > 0 
-        ? participant.user_trophies.sort((a: any, b: any) => new Date(b.awarded_at).getTime() - new Date(a.awarded_at).getTime())[0].awarded_at
-        : null;
-
-      // Check eligible trophies
-      const eligibleTrophies: string[] = [];
-      const existingTrophyIds = participant.user_trophies?.map((t: any) => t.trophy_id) || [];
-
-      trophyDefinitions.forEach(trophy => {
-        if (existingTrophyIds.includes(trophy.id)) return;
-
-        if (trophy.condition_type === '90_days_revenue' && revenue90d >= trophy.condition_value) {
-          eligibleTrophies.push(trophy.id);
-        } else if (trophy.condition_type === '90_days_profit' && profit90d >= trophy.condition_value) {
-          eligibleTrophies.push(trophy.id);
-        }
-      });
-
       return {
         id: participant.id,
         full_name: participant.full_name,
         email: participant.email,
         profile_photo_url: participant.profile_photo_url,
-        trophy_count: trophyCount,
-        last_trophy_date: lastTrophyDate,
-        current_90d_revenue: revenue90d,
-        current_90d_profit: profit90d,
-        eligible_trophies: eligibleTrophies
+        revenue_90d: revenue90d,
+        profit_90d: profit90d,
+        trophy_count: participant.user_trophies?.length || 0,
+        last_trophy_date: participant.user_trophies?.length 
+          ? participant.user_trophies.reduce((latest: string, t: any) => 
+              latest > t.awarded_at ? latest : t.awarded_at, '')
+          : null,
+        eligible_trophies: []
       };
-    }) || [];
+    });
 
     setParticipants(processedParticipants);
   };
 
   const fetchRecentAwards = async () => {
     const { data, error } = await supabase
-      .from('user_trophies')
+      .from('trophy_awards')
       .select(`
         id,
         user_id,
         trophy_id,
         awarded_at,
-        awarded_by,
         value_achieved,
-        profiles!inner(full_name)
+        profiles!inner(full_name),
+        trophies!inner(name, icon)
       `)
       .order('awarded_at', { ascending: false })
       .limit(20);
@@ -255,113 +181,120 @@ export default function AdminTrophies() {
       return;
     }
 
-    const processedAwards: TrophyAward[] = data?.map(award => {
-      const trophy = trophyDefinitions.find(t => t.id === award.trophy_id);
-      return {
-        id: award.id,
-        user_id: award.user_id,
-        trophy_id: award.trophy_id,
-        awarded_at: award.awarded_at,
-        awarded_by: award.awarded_by,
-        value_achieved: award.value_achieved,
-        full_name: (award.profiles as any).full_name,
-        trophy_name: trophy?.name || 'Trophée inconnu',
-        trophy_icon: trophy?.icon || '🏆'
-      };
-    }) || [];
+    const formattedData = data.map((award: any) => ({
+      id: award.id,
+      user_id: award.user_id,
+      trophy_id: award.trophy_id,
+      awarded_at: award.awarded_at,
+      value_achieved: award.value_achieved,
+      full_name: award.profiles.full_name,
+      trophy_name: award.trophies.name,
+      trophy_icon: award.trophies.icon
+    }));
 
-    setRecentAwards(processedAwards);
+    setRecentAwards(formattedData);
   };
 
   const processAutoAwards = async () => {
     setProcessingAuto(true);
-    let awardedCount = 0;
-
     try {
-      for (const participant of participants) {
-        for (const trophyId of participant.eligible_trophies) {
-          const trophy = trophyDefinitions.find(t => t.id === trophyId);
-          if (!trophy || !trophy.auto_award) continue;
-
-          let valueAchieved = 0;
-          if (trophy.condition_type === '90_days_revenue') {
-            valueAchieved = participant.current_90d_revenue;
-          } else if (trophy.condition_type === '90_days_profit') {
-            valueAchieved = participant.current_90d_profit;
-          }
-
-          await awardTrophy(participant.id, trophyId, valueAchieved, 'auto');
-          awardedCount++;
-        }
-      }
-
-      toast.success(`${awardedCount} trophée(s) attribué(s) automatiquement`);
-      await fetchData();
-    } catch (error) {
-      console.error('Error processing auto awards:', error);
-      toast.error('Erreur lors de l\'attribution automatique');
+      const { data, error } = await supabase.rpc('award_trophies_auto');
+      
+      if (error) throw error;
+      
+      toast.success(`${data.length} trophées attribués avec succès !`);
+      
+      // Recharger les données
+      await Promise.all([
+        fetchParticipants(),
+        fetchRecentAwards()
+      ]);
+      
+    } catch (err: any) {
+      console.error('Erreur lors de l\'attribution automatique:', err);
+      toast.error(err.message || 'Erreur lors de l\'attribution automatique');
     } finally {
       setProcessingAuto(false);
     }
   };
 
   const awardTrophy = async (userId: string, trophyId: string, valueAchieved: number, awardedBy: string) => {
-    const { error } = await supabase
-      .from('user_trophies')
-      .insert({
-        user_id: userId,
-        trophy_id: trophyId,
-        awarded_at: new Date().toISOString(),
-        awarded_by: awardedBy,
-        value_achieved: valueAchieved
-      });
+    try {
+      const { data, error } = await supabase
+        .from('trophy_awards')
+        .insert([
+          {
+            user_id: userId,
+            trophy_id: trophyId,
+            value_achieved: valueAchieved,
+            awarded_by: awardedBy
+          }
+        ])
+        .select();
 
-    if (error) {
+      if (error) throw error;
+      return data?.[0];
+    } catch (error) {
+      console.error('Error awarding trophy:', error);
       throw error;
     }
   };
 
   const handleManualAward = async () => {
     if (!selectedUser || !selectedTrophy) {
-      toast.error('Veuillez sélectionner un utilisateur et un trophée');
+      toast.error('Veuillez sélectionner une participante et un trophée');
       return;
     }
 
     try {
-      const value = manualValue ? parseInt(manualValue.replace(/\s/g, '')) : 0;
-      await awardTrophy(selectedUser, selectedTrophy, value, 'manual');
+      await awardTrophy(
+        selectedUser, 
+        selectedTrophy, 
+        parseFloat(manualValue) || 0,
+        'admin_manual'
+      );
       
-      toast.success('Trophée attribué manuellement');
+      toast.success('Trophée attribué avec succès !');
+      
+      // Recharger les données
+      await Promise.all([
+        fetchParticipants(),
+        fetchRecentAwards()
+      ]);
+      
+      // Réinitialiser les sélections
       setSelectedUser('');
       setSelectedTrophy('');
       setManualValue('');
-      await fetchData();
-    } catch (error) {
-      console.error('Error awarding trophy manually:', error);
-      toast.error('Erreur lors de l\'attribution manuelle');
+      
+    } catch (err: any) {
+      console.error('Erreur lors de l\'attribution manuelle:', err);
+      toast.error(err.message || 'Erreur lors de l\'attribution du trophée');
     }
   };
 
   const formatCurrency = (value: number) => {
-    return value.toLocaleString('fr-FR') + ' FCFA';
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'XOF',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(value).replace('XOF', 'FCFA');
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'dd MMM yyyy à HH:mm', { locale: fr });
+    return format(new Date(dateString), 'dd/MM/yyyy', { locale: fr });
   };
 
   if (loading) {
     return (
       <AdminLayout>
         <div className="flex items-center justify-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin" />
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </AdminLayout>
     );
   }
-
-  const eligibleCount = participants.reduce((sum, p) => sum + p.eligible_trophies.length, 0);
-  const totalTrophies = participants.reduce((sum, p) => sum + p.trophy_count, 0);
 
   return (
     <AdminLayout>
@@ -370,260 +303,251 @@ export default function AdminTrophies() {
         <div className="px-1">
           <h1 className="text-2xl md:text-3xl font-bold text-gray-900">🏆 Gestion des Trophées</h1>
           <p className="text-gray-600 mt-1 md:mt-2 text-sm md:text-base">
-            Attribution automatique et manuelle des récompenses
+            Gérez les attributions de trophées et consultez les statistiques
           </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-6">
-          <Card className="p-3 md:p-4">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-0 md:p-6 md:pb-2">
-              <CardTitle className="text-xs md:text-sm font-medium text-gray-600 leading-tight">
-                Trophées attribués
-              </CardTitle>
-              <Trophy className="h-4 w-4 text-yellow-600 flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-0 md:p-6 md:pt-0">
-              <div className="text-xl md:text-2xl font-bold">{totalTrophies}</div>
+        {/* Statistiques */}
+        <div className="grid gap-4 md:grid-cols-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Participantes</p>
+                  <p className="text-2xl font-bold">{participants.length}</p>
+                </div>
+                <div className="p-3 rounded-full bg-blue-100">
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="p-3 md:p-4">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-0 md:p-6 md:pb-2">
-              <CardTitle className="text-xs md:text-sm font-medium text-gray-600 leading-tight">
-                En attente d'attribution
-              </CardTitle>
-              <Award className="h-4 w-4 text-orange-600 flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-0 md:p-6 md:pt-0">
-              <div className="text-xl md:text-2xl font-bold">{eligibleCount}</div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Trophées attribués</p>
+                  <p className="text-2xl font-bold">
+                    {participants.reduce((sum, p) => sum + p.trophy_count, 0)}
+                  </p>
+                </div>
+                <div className="p-3 rounded-full bg-green-100">
+                  <Trophy className="h-6 w-6 text-green-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="p-3 md:p-4">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-0 md:p-6 md:pb-2">
-              <CardTitle className="text-xs md:text-sm font-medium text-gray-600 leading-tight">
-                Participantes actives
-              </CardTitle>
-              <Users className="h-4 w-4 text-blue-600 flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-0 md:p-6 md:pt-0">
-              <div className="text-xl md:text-2xl font-bold">{participants.length}</div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Dernier trophée</p>
+                  <p className="text-2xl font-bold">
+                    {recentAwards.length > 0 
+                      ? format(new Date(recentAwards[0].awarded_at), 'dd/MM/yyyy')
+                      : 'Aucun'}
+                  </p>
+                </div>
+                <div className="p-3 rounded-full bg-yellow-100">
+                  <Award className="h-6 w-6 text-yellow-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="p-3 md:p-4">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 p-0 md:p-6 md:pb-2">
-              <CardTitle className="text-xs md:text-sm font-medium text-gray-600 leading-tight">
-                Types de trophées
-              </CardTitle>
-              <Settings className="h-4 w-4 text-purple-600 flex-shrink-0" />
-            </CardHeader>
-            <CardContent className="p-0 md:p-6 md:pt-0">
-              <div className="text-xl md:text-2xl font-bold">{trophyDefinitions.length}</div>
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-500">Trophées disponibles</p>
+                  <p className="text-2xl font-bold">{trophies.length}</p>
+                </div>
+                <div className="p-3 rounded-full bg-purple-100">
+                  <Trophy className="h-6 w-6 text-purple-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Actions */}
+        {/* Boutons d'action */}
         <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
           <Button 
             onClick={processAutoAwards}
             disabled={processingAuto || eligibleCount === 0}
             className="bg-green-600 hover:bg-green-700 w-full sm:w-auto text-sm md:text-base"
-            size="sm"
           >
             {processingAuto ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                <span className="hidden sm:inline">Attribution en cours...</span>
-                <span className="sm:hidden">En cours...</span>
+                Traitement...
               </>
             ) : (
               <>
                 <Play className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Attribuer automatiquement ({eligibleCount})</span>
-                <span className="sm:hidden">Auto ({eligibleCount})</span>
+                Attribution automatique
               </>
             )}
           </Button>
 
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="outline" className="w-full sm:w-auto text-sm md:text-base" size="sm">
-                <Plus className="mr-2 h-4 w-4" />
-                <span className="hidden sm:inline">Attribution manuelle</span>
-                <span className="sm:hidden">Manuel</span>
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="w-[95vw] max-w-md mx-auto">
-              <DialogHeader>
-                <DialogTitle className="text-lg">Attribution manuelle de trophée</DialogTitle>
-                <DialogDescription className="text-sm">
-                  Attribuez un trophée spécifique à une participante
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="user-select" className="text-sm">Participante</Label>
-                  <Select value={selectedUser} onValueChange={setSelectedUser}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Sélectionner une participante" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {participants.map(participant => (
-                        <SelectItem key={participant.id} value={participant.id}>
-                          {participant.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="trophy-select" className="text-sm">Trophée</Label>
-                  <Select value={selectedTrophy} onValueChange={setSelectedTrophy}>
-                    <SelectTrigger className="mt-1">
-                      <SelectValue placeholder="Sélectionner un trophée" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {trophyDefinitions.map(trophy => (
-                        <SelectItem key={trophy.id} value={trophy.id}>
-                          {trophy.icon} {trophy.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label htmlFor="value" className="text-sm">Valeur atteinte (optionnel)</Label>
-                  <Input
-                    id="value"
-                    value={manualValue}
-                    onChange={(e) => setManualValue(e.target.value)}
-                    placeholder="Ex: 15000000"
-                    className="mt-1"
-                  />
-                </div>
-
-                <Button onClick={handleManualAward} className="w-full">
-                  Attribuer le trophée
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button 
+            variant="outline" 
+            className="w-full sm:w-auto text-sm md:text-base"
+            onClick={() => setActiveTab('manual')}
+          >
+            <UserCheck className="mr-2 h-4 w-4" />
+            Attribution manuelle
+          </Button>
         </div>
 
-        <Tabs defaultValue="participants" className="space-y-4 md:space-y-6">
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
           <TabsList className="grid w-full grid-cols-3 h-auto p-1">
             <TabsTrigger value="participants" className="text-xs md:text-sm py-2 md:py-3">
               <span className="hidden sm:inline">Participantes</span>
               <span className="sm:hidden">Users</span>
             </TabsTrigger>
             <TabsTrigger value="recent" className="text-xs md:text-sm py-2 md:py-3">
-              <span className="hidden sm:inline">Attributions récentes</span>
-              <span className="sm:hidden">Récent</span>
+              <span className="hidden sm:inline">Dernières attributions</span>
+              <span className="sm:hidden">Récents</span>
             </TabsTrigger>
-            <TabsTrigger value="definitions" className="text-xs md:text-sm py-2 md:py-3">
-              <span className="hidden sm:inline">Définitions des trophées</span>
-              <span className="sm:hidden">Types</span>
+            <TabsTrigger value="trophies" className="text-xs md:text-sm py-2 md:py-3">
+              Trophées
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="participants" className="space-y-3 md:space-y-4">
-            <div className="grid gap-3 md:gap-4">
-              {participants.map(participant => (
-                <Card key={participant.id}>
-                  <CardContent className="p-4 md:p-6">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0">
-                      <div className="flex items-center space-x-3 md:space-x-4">
-                        <div className="w-10 h-10 md:w-12 md:h-12 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-                          {participant.profile_photo_url ? (
-                            <img 
-                              src={participant.profile_photo_url} 
-                              alt={participant.full_name}
-                              className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <UserCheck className="h-5 w-5 md:h-6 md:w-6 text-gray-500" />
-                          )}
+            <div className="rounded-lg border">
+              <div className="grid grid-cols-12 gap-4 p-4 font-medium border-b bg-gray-50">
+                <div className="col-span-5">Participante</div>
+                <div className="col-span-2 text-center">Trophées</div>
+                <div className="col-span-2 text-center">Dernier</div>
+                <div className="col-span-3 text-right">CA 90j</div>
+              </div>
+              
+              {participants.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  Aucune participante trouvée
+                </div>
+              ) : (
+                participants.map(participant => (
+                  <div key={participant.id} className="grid grid-cols-12 gap-4 p-4 items-center border-b hover:bg-gray-50">
+                    <div className="col-span-5 flex items-center space-x-3">
+                      {participant.profile_photo_url ? (
+                        <img 
+                          src={participant.profile_photo_url} 
+                          alt={participant.full_name}
+                          className="h-10 w-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-10 w-10 rounded-full bg-gray-200 flex items-center justify-center">
+                          <span className="text-gray-500">
+                            {participant.full_name.charAt(0).toUpperCase()}
+                          </span>
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-sm md:text-base truncate">{participant.full_name}</h3>
-                          <p className="text-xs md:text-sm text-gray-600 truncate">{participant.email}</p>
-                          <div className="flex flex-wrap gap-1 md:gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {participant.trophy_count} trophée{participant.trophy_count > 1 ? 's' : ''}
-                            </Badge>
-                            {participant.eligible_trophies.length > 0 && (
-                              <Badge className="bg-orange-100 text-orange-800 text-xs">
-                                {participant.eligible_trophies.length} éligible{participant.eligible_trophies.length > 1 ? 's' : ''}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-left md:text-right pl-13 md:pl-0">
-                        <div className="text-xs md:text-sm text-gray-600">90 derniers jours</div>
-                        <div className="font-medium text-sm md:text-base">CA: {formatCurrency(participant.current_90d_revenue)}</div>
-                        <div className="font-medium text-sm md:text-base">Profit: {formatCurrency(participant.current_90d_profit)}</div>
-                        {participant.last_trophy_date && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            Dernier: {formatDate(participant.last_trophy_date)}
-                          </div>
-                        )}
+                      )}
+                      <div>
+                        <div className="font-medium">{participant.full_name}</div>
+                        <div className="text-sm text-gray-500">{participant.email}</div>
                       </div>
                     </div>
-                    {participant.eligible_trophies.length > 0 && (
-                      <div className="mt-3 md:mt-4 pt-3 md:pt-4 border-t">
-                        <div className="text-sm font-medium text-gray-700 mb-2">Trophées éligibles:</div>
-                        <div className="flex flex-wrap gap-1 md:gap-2">
-                          {participant.eligible_trophies.map(trophyId => {
-                            const trophy = trophyDefinitions.find(t => t.id === trophyId);
-                            return trophy ? (
-                              <Badge key={trophyId} className="bg-green-100 text-green-800 text-xs">
-                                {trophy.icon} <span className="hidden sm:inline">{trophy.name}</span>
-                              </Badge>
-                            ) : null;
-                          })}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                    
+                    <div className="col-span-2 text-center">
+                      <Badge variant={participant.trophy_count > 0 ? 'default' : 'outline'}>
+                        {participant.trophy_count}
+                      </Badge>
+                    </div>
+                    
+                    <div className="col-span-2 text-center text-sm text-gray-500">
+                      {participant.last_trophy_date ? formatDate(participant.last_trophy_date) : '-'}
+                    </div>
+                    
+                    <div className="col-span-3 text-right font-medium">
+                      {formatCurrency(participant.revenue_90d)}
+                    </div>
+                  </div>
+                ))
+              )}
             </div>
           </TabsContent>
 
           <TabsContent value="recent" className="space-y-3 md:space-y-4">
             <div className="grid gap-3 md:gap-4">
-              {recentAwards.map(award => (
-                <Card key={award.id}>
-                  <CardContent className="p-3 md:p-4">
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-2 md:space-y-0">
-                      <div className="flex items-center space-x-3 md:space-x-4">
-                        <div className="text-2xl md:text-3xl flex-shrink-0">{award.trophy_icon}</div>
-                        <div className="min-w-0 flex-1">
-                          <h3 className="font-semibold text-sm md:text-base truncate">{award.full_name}</h3>
-                          <p className="text-xs md:text-sm text-gray-600 truncate">{award.trophy_name}</p>
-                          <div className="flex items-center gap-1 md:gap-2 mt-1 flex-wrap">
-                            <Calendar className="h-3 w-3 text-gray-400 flex-shrink-0" />
-                            <span className="text-xs text-gray-500">
-                              {formatDate(award.awarded_at)}
-                            </span>
-                            <Badge variant={award.awarded_by === 'auto' ? 'default' : 'secondary'} className="text-xs">
-                              {award.awarded_by === 'auto' ? 'Auto' : 'Manuel'}
-                            </Badge>
+              {recentAwards.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  Aucune attribution récente
+                </div>
+              ) : (
+                recentAwards.map(award => (
+                  <Card key={award.id}>
+                    <CardContent className="p-3 md:p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+                            <span className="text-lg">{award.trophy_icon}</span>
+                          </div>
+                          <div>
+                            <p className="font-medium">{award.full_name}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {award.trophy_name}
+                            </p>
                           </div>
                         </div>
-                      </div>
-                      {award.value_achieved > 0 && (
-                        <div className="text-left md:text-right pl-11 md:pl-0">
-                          <div className="font-medium text-sm md:text-base">{formatCurrency(award.value_achieved)}</div>
-                          <div className="text-xs text-gray-500">Valeur atteinte</div>
+                        <div className="text-right">
+                          <p className="text-sm text-muted-foreground">
+                            {format(new Date(award.awarded_at), 'PPPp', { locale: fr })}
+                          </p>
+                          {award.value_achieved > 0 && (
+                            <p className="text-sm font-medium">
+                              {formatCurrency(award.value_achieved)}
+                            </p>
+                          )}
                         </div>
-                      )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="trophies">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {trophies.map((trophy) => (
+                <Card key={trophy.id} className="relative overflow-hidden">
+                  <div 
+                    className="absolute top-0 left-0 h-1 w-full"
+                    style={{ backgroundColor: trophy.color }}
+                  />
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">{trophy.name}</CardTitle>
+                      <div className="text-2xl">{trophy.icon}</div>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground mb-4">
+                      {trophy.description}
+                    </p>
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Condition:</span>
+                      <span className="font-medium">
+                        {trophy.condition_type === 'revenue_total' 
+                          ? `CA Total: ${formatCurrency(trophy.condition_value)}`
+                          : trophy.condition_type === 'monthly_best_profit'
+                            ? `Meilleur profit mensuel: ${formatCurrency(trophy.condition_value)}`
+                            : trophy.condition_type === 'annual_2025'
+                              ? `Objectif 2025: ${formatCurrency(trophy.condition_value)}`
+                              : `${formatCurrency(trophy.condition_value)}`}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-sm">
+                      <span className="text-muted-foreground">Attribution:</span>
+                      <Badge variant={trophy.auto_award ? 'default' : 'outline'}>
+                        {trophy.auto_award ? 'Automatique' : 'Manuelle'}
+                      </Badge>
                     </div>
                   </CardContent>
                 </Card>
@@ -631,41 +555,90 @@ export default function AdminTrophies() {
             </div>
           </TabsContent>
 
-          <TabsContent value="definitions" className="space-y-3 md:space-y-4">
-            <div className="grid gap-3 md:gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-              {trophyDefinitions.map(trophy => (
-                <Card key={trophy.id}>
-                  <CardHeader className="text-center p-4 md:p-6">
-                    <div className="text-3xl md:text-4xl mb-2">{trophy.icon}</div>
-                    <CardTitle className="text-base md:text-lg">{trophy.name}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="text-center p-4 md:p-6 pt-0">
-                    <p className="text-xs md:text-sm text-gray-600 mb-3 leading-relaxed">{trophy.description}</p>
-                    {trophy.condition_value > 0 && (
-                      <p className="text-xs md:text-sm font-medium mb-3">
-                        Objectif: {formatCurrency(trophy.condition_value)}
-                      </p>
+          <TabsContent value="manual">
+            <Card>
+              <CardHeader>
+                <CardTitle>Attribution manuelle d'un trophée</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Attribuez manuellement un trophée à une participante
+                </p>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Participante</label>
+                    <Select 
+                      value={selectedUser} 
+                      onValueChange={setSelectedUser}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner une participante" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {participants.map((p) => (
+                          <SelectItem key={p.id} value={p.id}>
+                            {p.full_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Trophée</label>
+                    <Select 
+                      value={selectedTrophy} 
+                      onValueChange={setSelectedTrophy}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Sélectionner un trophée" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {trophies
+                          .filter(t => !t.auto_award)
+                          .map((t) => (
+                            <SelectItem key={t.id} value={t.id}>
+                              <div className="flex items-center">
+                                <span className="mr-2">{t.icon}</span>
+                                {t.name}
+                              </div>
+                            </SelectItem>
+                          ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">
+                      Valeur (optionnel)
+                    </label>
+                    <input
+                      type="number"
+                      className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                      placeholder="Valeur du critère"
+                      value={manualValue}
+                      onChange={(e) => setManualValue(e.target.value)}
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end">
+                  <Button 
+                    onClick={handleManualAward}
+                    disabled={!selectedUser || !selectedTrophy || processingAuto}
+                  >
+                    {processingAuto ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Traitement...
+                      </>
+                    ) : (
+                      'Attribuer le trophée'
                     )}
-                    <div className="flex justify-center gap-1 md:gap-2 flex-wrap">
-                      <Badge 
-                        variant={trophy.auto_award ? 'default' : 'secondary'}
-                        className="text-xs"
-                      >
-                        {trophy.auto_award ? 'Auto' : 'Manuel'}
-                      </Badge>
-                      <Badge 
-                        variant="outline" 
-                        className="text-xs"
-                        style={{ borderColor: trophy.color, color: trophy.color }}
-                      >
-                        <span className="hidden sm:inline">{trophy.condition_type}</span>
-                        <span className="sm:hidden">{trophy.condition_type.split('_')[0]}</span>
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
         </Tabs>
       </div>
